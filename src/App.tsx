@@ -1,19 +1,10 @@
-import LeaveRequests from "./modules/hr/LeaveRequests"
-import LeavePlanning from "./modules/hr/LeavePlanning"
-import ExpenseRequests from "./modules/finance/ExpenseRequests"
-import Users from "./modules/admin/Users"
+import AppRouter from "./router/AppRouter"
+import { AuthProvider } from "./auth/AuthProvider"
 
-function App() {
+export default function App() {
   return (
-    <div>
-      <h1>HR & Finance App</h1>
-
-      <LeaveRequests />
-      <LeavePlanning />
-      <ExpenseRequests />
-      <Users />
-    </div>
+    <AuthProvider>
+      <AppRouter />
+    </AuthProvider>
   )
 }
-
-export default App
