@@ -1,4 +1,4 @@
-import { HashRouter, Routes, Route } from "react-router-dom"
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom"
 import { useAuth } from "../auth/AuthProvider"
 import LoginPage from "../pages/LoginPage"
 import MainLayout from "../layout/MainLayout"
@@ -11,18 +11,27 @@ function ProtectedRoute({ children }: any) {
   const { session } = useAuth()
 
   if (!session) {
-    return <Navigate to="/" />
+    return <Navigate to="/login" replace />
   }
 
   return children
 }
 
 export default function AppRouter() {
-  return (
-    <HashRouter>
-      <Routes>
-        <Route path="/" element={<LoginPage />} />
+  const { session } = useAuth()
 
+  return (
+    <BrowserRouter>
+      <Routes>
+        {/* Login */}
+        <Route
+          path="/login"
+          element={
+            session ? <Navigate to="/hr/leave-requests" replace /> : <LoginPage />
+          }
+        />
+
+        {/* Protected area */}
         <Route
           path="/"
           element={
@@ -36,7 +45,10 @@ export default function AppRouter() {
           <Route path="finance/expenses" element={<ExpenseRequests />} />
           <Route path="admin/users" element={<Users />} />
         </Route>
+
+        {/* fallback */}
+        <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
-    </HashRouter>
+    </BrowserRouter>
   )
 }

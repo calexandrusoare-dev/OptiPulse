@@ -14,7 +14,12 @@ export default function LoginPage() {
     if (error) {
       alert(error.message)
     } else {
-      window.location.href = "/"
+      import { useNavigate } from "react-router-dom"
+
+const navigate = useNavigate()
+
+// după login reușit:
+navigate("/hr/leave-requests")
     }
   }
 
