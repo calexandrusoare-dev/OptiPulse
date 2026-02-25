@@ -11,7 +11,7 @@ function ProtectedRoute({ children }: any) {
   const { session } = useAuth()
 
   if (!session) {
-    return <Navigate to="/login" replace />
+    return <Navigate to="/" />
   }
 
   return children
@@ -21,7 +21,7 @@ export default function AppRouter() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/login" element={<LoginPage />} />
+        <Route path="/" element={<LoginPage />} />
 
         <Route
           path="/"
@@ -31,13 +31,41 @@ export default function AppRouter() {
             </ProtectedRoute>
           }
         >
-          <Route path="hr/leave-requests" element={<LeaveRequests />} />
-          <Route path="hr/leave-planning" element={<LeavePlanning />} />
-          <Route path="finance/expenses" element={<ExpenseRequests />} />
-          <Route path="admin/users" element={<Users />} />
-        </Route>
+          <Route
+  path="/"
+  element={
+    <ProtectedRoute>
+      <MainLayout />
+    </ProtectedRoute>
+  }
+>
+  <Route
+    path="hr/leave-requests"
+    element={
+      <ProtectedRoute module="hr">
+        <LeaveRequests />
+      </ProtectedRoute>
+    }
+  />
 
-        <Route path="*" element={<Navigate to="/login" replace />} />
+  <Route
+    path="finance/expenses"
+    element={
+      <ProtectedRoute module="finance">
+        <ExpenseRequests />
+      </ProtectedRoute>
+    }
+  />
+
+  <Route
+    path="admin/users"
+    element={
+      <ProtectedRoute module="admin">
+        <Users />
+      </ProtectedRoute>
+    }
+  />
+</Route>
       </Routes>
     </BrowserRouter>
   )
