@@ -18,20 +18,11 @@ function ProtectedRoute({ children }: any) {
 }
 
 export default function AppRouter() {
-  const { session } = useAuth()
-
   return (
     <BrowserRouter>
       <Routes>
-        {/* Login */}
-        <Route
-          path="/login"
-          element={
-            session ? <Navigate to="/hr/leave-requests" replace /> : <LoginPage />
-          }
-        />
+        <Route path="/login" element={<LoginPage />} />
 
-        {/* Protected area */}
         <Route
           path="/"
           element={
@@ -46,7 +37,6 @@ export default function AppRouter() {
           <Route path="admin/users" element={<Users />} />
         </Route>
 
-        {/* fallback */}
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     </BrowserRouter>
