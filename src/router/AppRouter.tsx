@@ -5,7 +5,8 @@
 
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom"
 import { useAuth } from "../auth/AuthProvider"
-import { ProtectedRoute, UnauthorizedPage } from "../auth/ProtectedRoute"
+import ProtectedRoute from "../auth/ProtectedRoute"
+import AccessDenied from "../pages/AccessDenied"
 
 // Pages
 import LoginPage from "../pages/LoginPage"
@@ -54,102 +55,26 @@ export default function AppRouter() {
           path="/login"
           element={session ? <Navigate to="/" replace /> : <LoginPage />}
         />
-        <Route path="/unauthorized" element={<UnauthorizedPage />} />
+        <Route path="/access-denied" element={<AccessDenied />} />
 
         {/* Protected Routes */}
-        <Route
-          path="/"
-          element={
-            <ProtectedRoute>
-              <MainLayout />
-            </ProtectedRoute>
-          }
-        >
+        <Route element={<ProtectedRoute><MainLayout /></ProtectedRoute>}>
           {/* Dashboard Route */}
-          <Route
-            index
-            element={
-              <ProtectedRoute>
-                <Dashboard />
-              </ProtectedRoute>
-            }
-          />
+          <Route index element={<Dashboard />} />
 
           {/* HR Module Routes */}
-          <Route path="hr">
-            <Route
-              path="leave-requests"
-              element={
-                <ProtectedRoute moduleCode="hr" permissionCode="view">
-                  <LeaveRequests />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="leave-planning"
-              element={
-                <ProtectedRoute moduleCode="hr" permissionCode="view">
-                  <LeavePlanning />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="overtime"
-              element={
-                <ProtectedRoute moduleCode="hr">
-                  <Overtime />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="time-entries"
-              element={
-                <ProtectedRoute moduleCode="hr">
-                  <TimeEntries />
-                </ProtectedRoute>
-              }
-            />
-          </Route>
+          <Route path="hr/leave-requests" element={<ProtectedRoute moduleCode="hr"><LeaveRequests /></ProtectedRoute>} />
+          <Route path="hr/leave-planning" element={<ProtectedRoute moduleCode="hr"><LeavePlanning /></ProtectedRoute>} />
+          <Route path="hr/overtime" element={<ProtectedRoute moduleCode="hr"><Overtime /></ProtectedRoute>} />
+          <Route path="hr/time-entries" element={<ProtectedRoute moduleCode="hr"><TimeEntries /></ProtectedRoute>} />
 
           {/* Finance Module Routes */}
-          <Route path="finance">
-            <Route
-              path="expenses"
-              element={
-                <ProtectedRoute moduleCode="finance">
-                  <ExpenseRequests />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="budgets"
-              element={
-                <ProtectedRoute moduleCode="finance">
-                  <Budgets />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="kpi"
-              element={
-                <ProtectedRoute moduleCode="finance">
-                  <KPI />
-                </ProtectedRoute>
-              }
-            />
-          </Route>
+          <Route path="finance/expenses" element={<ProtectedRoute moduleCode="finance"><ExpenseRequests /></ProtectedRoute>} />
+          <Route path="finance/budgets" element={<ProtectedRoute moduleCode="finance"><Budgets /></ProtectedRoute>} />
+          <Route path="finance/kpi" element={<ProtectedRoute moduleCode="finance"><KPI /></ProtectedRoute>} />
 
           {/* Admin Module Routes */}
-          <Route path="admin">
-            <Route
-              path="users"
-              element={
-                <ProtectedRoute moduleCode="admin" permissionCode="view">
-                  <Users />
-                </ProtectedRoute>
-              }
-            />
-          </Route>
+          <Route path="admin/users" element={<ProtectedRoute moduleCode="admin"><Users /></ProtectedRoute>} />
         </Route>
 
         {/* Catch-all - redirect to home or login */}
