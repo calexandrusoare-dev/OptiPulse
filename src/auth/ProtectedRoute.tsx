@@ -3,61 +3,43 @@
  * Route access control with RBAC
  */
 
-import { Navigate, useLocation } from "react-router-dom"
-import { ReactNode } from "react"
-import { useAuth } from "./AuthProvider"
-import { hasModuleAccess } from "../lib/rbac"
+
+import React from "react";
+import { Navigate, useLocation } from "react-router-dom";
+import { useAuth } from "./AuthProvider";
+import { hasModuleAccess } from "../lib/rbac";
 
 interface ProtectedRouteProps {
-  children: ReactNode
-  moduleCode?: string
-  permissionCode?: string
-  fallback?: ReactNode
+  children: JSX.Element;
+  moduleCode?: string;
 }
 
-/**
- * ProtectedRoute Component
- * Validates user authentication and RBAC permissions
- *
- * @param children Component to render if authorized
- * @param moduleCode Module code to check (optional)
- * @param permissionCode Specific permission to check (optional)
- * @param fallback Component to render if unauthorized (default: redirect to /login)
- */
-export function ProtectedRoute({
+export default function ProtectedRoute({
   children,
   moduleCode,
-  permissionCode,
-  fallback = null,
-}: ProtectedRouteProps): ReactNode {
-  const { session, permissions } = useAuth()
-  const location = useLocation()
+}: ProtectedRouteProps) {
+  const { session, permissions } = useAuth();
+  const location = useLocation();
 
-  // Check if user is authenticated
+  // dacă nu este autentificat
   if (!session) {
-    // Redirect to login page, preserving the location they were trying to access
-    return <Navigate to="/login" state={{ from: location }} replace />
+    return <Navigate to="/" replace state={{ from: location }} />;
   }
 
-  // Check module access if moduleCode is provided
+  // dacă este autentificat dar nu are permisiunea cerută
   if (moduleCode) {
-    const hasAccess = hasModuleAccess(
-      permissions,
-      moduleCode,
-      permissionCode
-    )
+    const hasAccess = permissions?.some(
+      (p) =>
+        p.module_code === moduleCode && p.permission_code === "view"
+    );
 
     if (!hasAccess) {
-      // Render fallback or redirect to unauthorized page
-      if (fallback) {
-        return fallback
-      }
-
-      return <Navigate to="/unauthorized" replace />
+      // îl trimitem către o pagină de acces refuzat
+      return <Navigate to="/access-denied" replace />;
     }
   }
 
-  return children
+  return children;
 }
 
 /**
