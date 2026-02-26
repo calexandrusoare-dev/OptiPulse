@@ -1,59 +1,62 @@
+/**
+ * OptiPulse - Application Router
+ * Nested routes with RBAC protection on all routes
+ */
+
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom"
 import { useAuth } from "../auth/AuthProvider"
+import { ProtectedRoute, UnauthorizedPage } from "../auth/ProtectedRoute"
 
+// Pages
 import LoginPage from "../pages/LoginPage"
 import MainLayout from "../layout/MainLayout"
+import Dashboard from "../pages/Dashboard"
 
+// HR Module
 import LeaveRequests from "../modules/hr/LeaveRequests"
 import LeavePlanning from "../modules/hr/LeavePlanning"
+import Overtime from "../modules/hr/Overtime"
+import TimeEntries from "../modules/hr/TimeEntries"
+
+// Finance Module
 import ExpenseRequests from "../modules/finance/ExpenseRequests"
+import Budgets from "../modules/finance/Budgets"
+import KPI from "../modules/finance/KPI"
+
+// Admin Module
 import Users from "../modules/admin/Users"
 
-function ProtectedRoute({
-  children,
-  module,
-}: {
-  children: JSX.Element
-  module?: string
-}) {
-  const { session, permissions } = useAuth()
-
-  if (!session) {
-    return <Navigate to="/login" replace />
-  }
-
-  if (module) {
-    const hasAccess = permissions.some(
-      (p) => p.module === module
-    )
-
-    if (!hasAccess) {
-      return <Navigate to="/login" replace />
-    }
-  }
-
-  return children
-}
-
 export default function AppRouter() {
-  const { session } = useAuth()
+  const { session, loading } = useAuth()
+
+  // Show loading state while auth initializes
+  if (loading) {
+    return (
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          minHeight: "100vh",
+          backgroundColor: "var(--bg-secondary)",
+        }}
+      >
+        <div className="loading"></div>
+      </div>
+    )
+  }
 
   return (
     <BrowserRouter>
       <Routes>
-        {/* Login */}
+        {/* Public Routes */}
         <Route
           path="/login"
-          element={
-            session ? (
-              <Navigate to="/hr/leave-requests" replace />
-            ) : (
-              <LoginPage />
-            )
-          }
+          element={session ? <Navigate to="/" replace /> : <LoginPage />}
         />
+        <Route path="/unauthorized" element={<UnauthorizedPage />} />
 
-        {/* Protected area */}
+        {/* Protected Routes */}
         <Route
           path="/"
           element={
@@ -62,45 +65,95 @@ export default function AppRouter() {
             </ProtectedRoute>
           }
         >
+          {/* Dashboard Route */}
           <Route
-            path="hr/leave-requests"
+            index
             element={
-              <ProtectedRoute module="hr">
-                <LeaveRequests />
+              <ProtectedRoute>
+                <Dashboard />
               </ProtectedRoute>
             }
           />
 
-          <Route
-            path="hr/leave-planning"
-            element={
-              <ProtectedRoute module="hr">
-                <LeavePlanning />
-              </ProtectedRoute>
-            }
-          />
+          {/* HR Module Routes */}
+          <Route path="hr">
+            <Route
+              path="leave-requests"
+              element={
+                <ProtectedRoute moduleCode="hr" permissionCode="view">
+                  <LeaveRequests />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="leave-planning"
+              element={
+                <ProtectedRoute moduleCode="hr" permissionCode="view">
+                  <LeavePlanning />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="overtime"
+              element={
+                <ProtectedRoute moduleCode="hr">
+                  <Overtime />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="time-entries"
+              element={
+                <ProtectedRoute moduleCode="hr">
+                  <TimeEntries />
+                </ProtectedRoute>
+              }
+            />
+          </Route>
 
-          <Route
-            path="finance/expenses"
-            element={
-              <ProtectedRoute module="finance">
-                <ExpenseRequests />
-              </ProtectedRoute>
-            }
-          />
+          {/* Finance Module Routes */}
+          <Route path="finance">
+            <Route
+              path="expenses"
+              element={
+                <ProtectedRoute moduleCode="finance">
+                  <ExpenseRequests />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="budgets"
+              element={
+                <ProtectedRoute moduleCode="finance">
+                  <Budgets />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="kpi"
+              element={
+                <ProtectedRoute moduleCode="finance">
+                  <KPI />
+                </ProtectedRoute>
+              }
+            />
+          </Route>
 
-          <Route
-            path="admin/users"
-            element={
-              <ProtectedRoute module="admin">
-                <Users />
-              </ProtectedRoute>
-            }
-          />
+          {/* Admin Module Routes */}
+          <Route path="admin">
+            <Route
+              path="users"
+              element={
+                <ProtectedRoute moduleCode="admin" permissionCode="view">
+                  <Users />
+                </ProtectedRoute>
+              }
+            />
+          </Route>
         </Route>
 
-        {/* fallback */}
-        <Route path="*" element={<Navigate to="/login" replace />} />
+        {/* Catch-all - redirect to home or login */}
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
   )

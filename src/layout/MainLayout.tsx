@@ -1,71 +1,32 @@
-import { Outlet, Link, useNavigate } from "react-router-dom"
-import { supabase } from "../api/supabaseClient"
+/**
+ * OptiPulse - Main Layout Component
+ * Two-column enterprise layout with sidebar and main content area
+ */
+
+import { Outlet } from "react-router-dom"
 import { useAuth } from "../auth/AuthProvider"
+import Sidebar from "./Sidebar"
 
 export default function MainLayout() {
-  const { permissions } = useAuth()
-  const navigate = useNavigate()
-
-  const logout = async () => {
-    await supabase.auth.signOut()
-    navigate("/login")
-  }
-
-  const hasModule = (module: string) =>
-    permissions.some(p => p.module === module)
+  const { user } = useAuth()
 
   return (
-    <div style={{ display: "flex", minHeight: "100vh" }}>
-      <aside
-        style={{
-          width: "250px",
-          background: "#1f2937",
-          color: "white",
-          padding: "20px",
-        }}
-      >
-        <h2>OptiPulse</h2>
+    <div className="main-layout">
+      {/* Sidebar Navigation */}
+      <Sidebar />
 
-        {hasModule("hr") && (
-          <div>
-            <Link to="/hr/leave-requests" style={{ color: "white" }}>
-              Concedii
-            </Link>
-          </div>
-        )}
+      {/* Header */}
+      <header className="main-header">
+        <div>
+          <h1 className="header-title">OptiPulse Dashboard</h1>
+        </div>
+        <div className="header-user">
+          <span>{user?.full_name || user?.email}</span>
+        </div>
+      </header>
 
-        {hasModule("finance") && (
-          <div>
-            <Link to="/finance/expenses" style={{ color: "white" }}>
-              Cheltuieli
-            </Link>
-          </div>
-        )}
-
-        {hasModule("admin") && (
-          <div>
-            <Link to="/admin/users" style={{ color: "white" }}>
-              Utilizatori
-            </Link>
-          </div>
-        )}
-
-        <button
-          onClick={logout}
-          style={{
-            marginTop: "20px",
-            background: "#dc2626",
-            color: "white",
-            border: "none",
-            padding: "8px",
-            cursor: "pointer",
-          }}
-        >
-          Logout
-        </button>
-      </aside>
-
-      <main style={{ flex: 1, padding: "30px", background: "#f3f4f6" }}>
+      {/* Main Content Area */}
+      <main className="main-content">
         <Outlet />
       </main>
     </div>

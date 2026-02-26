@@ -1,51 +1,151 @@
-import { useState } from "react"
+/**
+ * OptiPulse HR - Leave Planning Module
+ * Manage leave schedules and team planning
+ */
+
+import { useEffect, useState } from "react"
+import { useAuth } from "../../auth/AuthProvider"
 import { supabase } from "../../api/supabaseClient"
+import { canCreate, canEdit } from "../../lib/rbac"
+import { LeaveRequest } from "../../types"
 
 export default function LeavePlanning() {
-  const [startDate, setStartDate] = useState("")
-  const [endDate, setEndDate] = useState("")
-  const [year, setYear] = useState(new Date().getFullYear())
+  const { permissions } = useAuth()
+  const [requests, setRequests] = useState<LeaveRequest[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [filter, setFilter] = useState<"all" | "approved" | "pending">("all")
 
-  async function savePlanning() {
-    const { data: userData } = await supabase.auth.getUser()
+  const moduleCode = "hr"
+  const canManage = canEdit(permissions, moduleCode)
 
-    const { data: workingDays } = await supabase.rpc(
-      "calculate_working_days",
-      {
-        p_location_id: null,
-        p_start_date: startDate,
-        p_end_date: endDate
+  /**
+   * Load approved leave requests for planning view
+   */
+  const loadPlanning = async () => {
+    try {
+      setError(null)
+      setLoading(true)
+
+      let query = supabase
+        .from("leave_requests")
+        .select("*")
+        .order("start_date", { ascending: true })
+
+      if (filter === "approved") {
+        query = query.eq("status", "approved")
+      } else if (filter === "pending") {
+        query = query.eq("status", "pending")
       }
-    )
 
-    await supabase.from("leave_planning").insert({
-      employee_id: userData.user?.id,
-      location_id: null,
-      year,
-      start_date: startDate,
-      end_date: endDate,
-      days: workingDays,
-      status: "draft"
-    })
+      const { data, error: err } = await query
 
-    alert("Planning saved")
+      if (err) throw err
+
+      setRequests((data as LeaveRequest[]) || [])
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load planning")
+      console.error("Load error:", err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadPlanning()
+  }, [filter])
+
+  const getStatusClass = (status: string) => {
+    const statusMap: Record<string, string> = {
+      pending: "status-pending",
+      approved: "status-approved",
+      rejected: "status-rejected",
+    }
+    return statusMap[status] || ""
   }
 
   return (
     <div>
-      <h2>Leave Planning</h2>
+      <div className="content-header">
+        <h2 className="content-title">Leave Planning</h2>
+        <div className="content-actions">
+          <select
+            value={filter}
+            onChange={(e) =>
+              setFilter(e.target.value as "all" | "approved" | "pending")
+            }
+            style={{ padding: "8px 12px" }}
+          >
+            <option value="all">All Requests</option>
+            <option value="pending">Pending</option>
+            <option value="approved">Approved</option>
+          </select>
+        </div>
+      </div>
 
-      <input type="number"
-             value={year}
-             onChange={e => setYear(Number(e.target.value))} />
+      {error && <div className="alert alert-error">{error}</div>}
 
-      <input type="date"
-             onChange={e => setStartDate(e.target.value)} />
+      {loading && <div className="loading"></div>}
 
-      <input type="date"
-             onChange={e => setEndDate(e.target.value)} />
+      {!loading && requests.length === 0 && (
+        <div className="empty-state">
+          <div className="empty-state-icon">📅</div>
+          <h3 className="empty-state-title">No leave planned</h3>
+          <p className="empty-state-description">
+            No leave requests found for the selected filter
+          </p>
+        </div>
+      )}
 
-      <button onClick={savePlanning}>Save Planning</button>
+      {!loading && requests.length > 0 && (
+        <div className="table-container">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Employee</th>
+                <th>Start Date</th>
+                <th>End Date</th>
+                <th>Duration</th>
+                <th>Leave Type</th>
+                <th>Status</th>
+                <th>Reason</th>
+              </tr>
+            </thead>
+            <tbody>
+              {requests.map((req) => (
+                <tr key={req.id}>
+                  <td>{req.employee_id}</td>
+                  <td>{req.start_date}</td>
+                  <td>{req.end_date}</td>
+                  <td>{req.days} days</td>
+                  <td>{req.leave_type_id}</td>
+                  <td>
+                    <span className={`table-status ${getStatusClass(req.status)}`}>
+                      {req.status}
+                    </span>
+                  </td>
+                  <td>{req.reason || "-"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <div
+        style={{
+          marginTop: "20px",
+          padding: "16px",
+          backgroundColor: "var(--gray-50)",
+          borderRadius: "8px",
+          fontSize: "14px",
+          color: "var(--gray-600)",
+        }}
+      >
+        <strong>Note:</strong> This view displays all leave requests to help with
+        team planning. Approved requests are prioritized in scheduling.
+      </div>
     </div>
   )
+}
 }
