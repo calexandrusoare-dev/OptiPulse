@@ -18,12 +18,17 @@ export default function ProtectedRoute({
   children,
   moduleCode,
 }: ProtectedRouteProps) {
-  const { session, permissions } = useAuth();
+  const { session, permissions, loading } = useAuth();
   const location = useLocation();
+
+  // Așteaptă să se termine loading-ul auth
+  if (loading) {
+    return null;
+  }
 
   // dacă nu este autentificat
   if (!session) {
-    return <Navigate to="/" replace state={{ from: location }} />;
+    return <Navigate to="/login" replace state={{ from: location }} />;
   }
 
   // dacă este autentificat dar nu are permisiunea cerută
