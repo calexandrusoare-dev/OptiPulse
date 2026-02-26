@@ -5,7 +5,7 @@
 
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom"
 import { useAuth } from "../auth/AuthProvider"
-import ProtectedRoute from "../auth/ProtectedRoute"
+import { ProtectedRoute } from "../auth/ProtectedRoute"
 import AccessDenied from "../pages/AccessDenied"
 
 // Pages
