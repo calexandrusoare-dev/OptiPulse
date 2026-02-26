@@ -22,7 +22,11 @@ export default function ProtectedRoute({
   // dacă este autentificat dar nu are permisiunea cerută
   if (moduleCode) {
     const hasAccess = permissions?.some(
+<<<<<<< HEAD
       (p: { module_code: string; permission_code: string }) =>
+=======
+      (p) =>
+>>>>>>> 0b26307a83555bc52300dc62d773bd5365fe1303
         p.module_code === moduleCode && p.permission_code === "view"
     );
 
@@ -33,4 +37,8 @@ export default function ProtectedRoute({
   }
 
   return children;
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> 0b26307a83555bc52300dc62d773bd5365fe1303
