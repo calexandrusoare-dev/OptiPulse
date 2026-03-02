@@ -140,8 +140,24 @@ export function AuthProvider({ children }: AuthProviderProps) {
       }
     })
 
+    // when the browser (or tab) is closed) attempt to sign out so that any
+    // transient state is cleaned up. This complements using sessionStorage in
+    // the client setup above and also makes the logout explicit instead of
+    // relying solely on storage eviction.
+    const handleBeforeUnload = async () => {
+      try {
+        await supabase.auth.signOut()
+      } catch (err) {
+        // failure isn't critical; the storage will be cleared by sessionStorage
+        console.warn("Error signing out on unload:", err)
+      }
+    }
+
+    window.addEventListener("beforeunload", handleBeforeUnload)
+
     return () => {
       subscription.unsubscribe()
+      window.removeEventListener("beforeunload", handleBeforeUnload)
     }
   }, [])
 
