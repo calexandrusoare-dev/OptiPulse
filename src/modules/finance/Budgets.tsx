@@ -293,34 +293,4 @@ const Budgets = () => {
   );
 };
 
-export default Budgets;                      overflow: "hidden",
-                    }}
-                  >
-                    <div
-                      style={{
-                        width: `${Math.min(percentageUsed, 100)}%`,
-                        height: "100%",
-                        backgroundColor: color,
-                        transition: "width 0.2s ease",
-                      }}
-                    />
-                  </div>
-                  <div
-                    style={{
-                      textAlign: "right",
-                      marginTop: "4px",
-                      fontSize: "12px",
-                      color: "var(--gray-600)",
-                    }}
-                  >
-                    {percentageUsed.toFixed(1)}% used • ${budget.remaining_amount.toLocaleString()} remaining
-                  </div>
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      )}
-    </div>
-  )
-}
+export default Budgets;
