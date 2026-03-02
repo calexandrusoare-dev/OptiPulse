@@ -21,9 +21,13 @@ export function hasPermission(
     return false
   }
 
+  const m = moduleCode.toLowerCase()
+  const pcode = permissionCode.toLowerCase()
+
   return permissions.some(
     (p) =>
-      p.module_code === moduleCode && p.permission_code === permissionCode
+      p.module_code.toLowerCase() === m &&
+      p.permission_code.toLowerCase() === pcode
   )
 }
 
@@ -41,7 +45,8 @@ export function canView(
     return false
   }
 
-  return permissions.some((p) => p.module_code === moduleCode)
+  const m = moduleCode.toLowerCase()
+  return permissions.some((p) => p.module_code.toLowerCase() === m)
 }
 
 /**
@@ -106,7 +111,8 @@ export function getUserModules(permissions: UserPermission[]): string[] {
     return []
   }
 
-  const modules = new Set(permissions.map((p) => p.module_code))
+  // normalize codes so UI filtering is case-insensitive
+  const modules = new Set(permissions.map((p) => p.module_code.toLowerCase()))
   return Array.from(modules)
 }
 
@@ -124,8 +130,9 @@ export function getModulePermissions(
     return []
   }
 
+  const m = moduleCode.toLowerCase()
   return permissions
-    .filter((p) => p.module_code === moduleCode)
+    .filter((p) => p.module_code.toLowerCase() === m)
     .map((p) => p.permission_code)
 }
 
@@ -188,11 +195,13 @@ export function getPermissionMatrix(
   const matrix: Record<string, string[]> = {}
 
   permissions.forEach((p) => {
-    if (!matrix[p.module_code]) {
-      matrix[p.module_code] = []
+    const module = p.module_code.toLowerCase()
+    if (!matrix[module]) {
+      matrix[module] = []
     }
-    if (!matrix[p.module_code].includes(p.permission_code)) {
-      matrix[p.module_code].push(p.permission_code)
+    const perm = p.permission_code.toLowerCase()
+    if (!matrix[module].includes(perm)) {
+      matrix[module].push(perm)
     }
   })
 

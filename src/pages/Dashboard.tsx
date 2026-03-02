@@ -60,6 +60,22 @@ export default function Dashboard() {
           <p className="empty-state-description">
             Contact your administrator to request access to modules.
           </p>
+          {/* helpful debug info for developers/admins */}
+          <div style={{ marginTop: "16px", fontSize: "12px", color: "var(--gray-600)" }}>
+            <strong>Debug:</strong> permissions loaded from backend:
+            <pre
+              style={{
+                maxHeight: "150px",
+                overflow: "auto",
+                background: "#f9f9f9",
+                padding: "8px",
+                borderRadius: "4px",
+                marginTop: "4px",
+              }}
+            >
+              {JSON.stringify(permissions, null, 2)}
+            </pre>
+          </div>
         </div>
       )}
 
