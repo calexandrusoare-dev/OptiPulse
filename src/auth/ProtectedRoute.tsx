@@ -33,10 +33,8 @@ export default function ProtectedRoute({
 
   // dacă este autentificat dar nu are permisiunea cerută
   if (moduleCode) {
-    const hasAccess = permissions?.some(
-      (p) =>
-        p.module_code === moduleCode && p.permission_code === "view"
-    );
+    // require any permission in the module (view/edit/create/…)
+    const hasAccess = hasModuleAccess(permissions, moduleCode);
 
     if (!hasAccess) {
       // îl trimitem către o pagină de acces refuzat

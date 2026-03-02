@@ -102,7 +102,13 @@ const matrix = getPermissionMatrix(permissions)
 - Supabase account cu:
   - Tabel `auth.users` (default Supabase)
   - Tabele business: `core.modules`, `core.permissions`, `core.module_permission_definitions`, `core.user_permissions`
-  - View: `core.v_user_permissions`
+  - View: `core.v_user_permissions` (see `db/migrations/20260227_create_v_user_permissions.sql`)
+
+> **Migrations**: the `db/migrations` folder contains SQL files that must be
+> executed against the database when initializing or updating the schema. If
+> you enable the Supabase GitHub integration, these scripts will be executed
+> automatically on each push to `main`. Otherwise run them manually via the
+> SQL editor or `psql`.
 
 ### Instalare
 

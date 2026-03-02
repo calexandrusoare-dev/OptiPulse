@@ -30,8 +30,10 @@ export default function LoginPage() {
         return
       }
 
-      // Navigate to first available module or dashboard
-      navigate("/hr/leave-requests")
+      // After successful login, send user to dashboard (root).
+      // Previously we hardcoded an HR route which caused access-denied
+      // if the user didn't have HR permissions.
+      navigate("/")
     } catch (err) {
       setErrorMessage("An unexpected error occurred. Please try again.")
     } finally {
