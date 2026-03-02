@@ -3,386 +3,321 @@
  * Manage leave request lifecycle with RBAC
  */
 
-import { useEffect, useState } from "react"
-import { useAuth } from "../../auth/AuthProvider"
-import { supabase } from "../../api/supabaseClient"
+import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
-  canCreate,
-  canEdit,
-  canDelete,
-  canApprove,
-  hasPermission,
-} from "../../lib/rbac"
-import { LeaveRequest } from "../../types"
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { Plus, Calendar, List, Filter, Download } from 'lucide-react';
+import { formatDate, getStatusColor, vacationTypes } from '@/lib/utils';
 
-export default function LeaveRequests() {
-  const { user, permissions } = useAuth()
-  const [requests, setRequests] = useState<LeaveRequest[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [showForm, setShowForm] = useState(false)
+const mockVacations = [
+  {
+    id: 1,
+    employee: 'Maria Popescu',
+    startDate: '2024-04-15',
+    endDate: '2024-04-19',
+    type: 'odihna',
+    status: 'aprobat',
+    days: 5,
+  },
+  {
+    id: 2,
+    employee: 'Ion Ionescu',
+    startDate: '2024-04-22',
+    endDate: '2024-04-26',
+    type: 'medical',
+    status: 'pending',
+    days: 5,
+  },
+  {
+    id: 3,
+    employee: 'Ana Georgescu',
+    startDate: '2024-05-01',
+    endDate: '2024-05-05',
+    type: 'odihna',
+    status: 'trimis',
+    days: 5,
+  },
+  {
+    id: 4,
+    employee: 'John Doe',
+    startDate: '2024-03-10',
+    endDate: '2024-03-12',
+    type: 'fara_plata',
+    status: 'respins',
+    days: 3,
+  },
+  {
+    id: 5,
+    employee: 'Elena Dumitrescu',
+    startDate: '2024-06-01',
+    endDate: '2024-06-15',
+    type: 'odihna',
+    status: 'aprobat',
+    days: 15,
+  },
+];
 
-  // Form state
+const calendarEvents = [
+  { date: '15-19 Aprilie', employee: 'Maria Popescu', type: 'odihna' },
+  { date: '22-26 Aprilie', employee: 'Ion Ionescu', type: 'medical' },
+  { date: '1-5 Mai', employee: 'Ana Georgescu', type: 'odihna' },
+  { date: '1-15 Iunie', employee: 'Elena Dumitrescu', type: 'odihna' },
+];
+
+const Vacations = () => {
+  const { t } = useTranslation()
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [vacationType, setVacationType] = useState('');
   const [formData, setFormData] = useState({
-    start_date: "",
-    end_date: "",
-    leave_type_id: "vacation",
-    reason: "",
-  })
+    startDate: '',
+    endDate: '',
+  });
 
-  const moduleCode = "hr"
-
-  // Permission checks
-  const canCreateRequest = canCreate(permissions, moduleCode)
-  const canApproveRequests = canApprove(permissions, moduleCode)
-  const canEditRequest = canEdit(permissions, moduleCode)
-  const canDeleteRequest = canDelete(permissions, moduleCode)
-
-  /**
-   * Load leave requests
-   */
-  const loadRequests = async () => {
-    try {
-      setError(null)
-      setLoading(true)
-
-      const { data, error: err } = await supabase
-        .from("leave_requests")
-        .select("*")
-        .order("created_at", { ascending: false })
-
-      if (err) throw err
-
-      setRequests((data as LeaveRequest[]) || [])
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load requests")
-      console.error("Load error:", err)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    loadRequests()
-  }, [])
-
-  /**
-   * Create new leave request
-   */
-  const handleCreateRequest = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
-
-    if (!user) {
-      setError("User not authenticated")
-      return
-    }
-
-    if (!formData.start_date || !formData.end_date) {
-      setError("Please fill in all required fields")
-      return
-    }
-
-    const startDate = new Date(formData.start_date)
-    const endDate = new Date(formData.end_date)
-
-    if (startDate > endDate) {
-      setError("Start date must be before end date")
-      return
-    }
-
-    try {
-      setError(null)
-      setLoading(true)
-
-      // Calculate working days
-      const days =
-        Math.ceil(
-          (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)
-        ) + 1
-
-      const { error: err } = await supabase.from("leave_requests").insert({
-        employee_id: user.id,
-        leave_type_id: formData.leave_type_id,
-        start_date: formData.start_date,
-        end_date: formData.end_date,
-        days,
-        reason: formData.reason,
-        status: "pending",
-      })
-
-      if (err) throw err
-
-      setFormData({
-        start_date: "",
-        end_date: "",
-        leave_type_id: "vacation",
-        reason: "",
-      })
-      setShowForm(false)
-      await loadRequests()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create request")
-      console.error("Create error:", err)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  /**
-   * Approve leave request
-   */
-  const handleApprove = async (requestId: string) => {
-    if (!canApproveRequests) {
-      setError("You don't have permission to approve requests")
-      return
-    }
-
-    try {
-      setError(null)
-
-      const { error: err } = await supabase
-        .from("leave_requests")
-        .update({
-          status: "approved",
-          reviewed_at: new Date().toISOString(),
-        })
-        .eq("id", requestId)
-
-      if (err) throw err
-
-      await loadRequests()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to approve request")
-    }
-  }
-
-  /**
-   * Reject leave request
-   */
-  const handleReject = async (requestId: string) => {
-    if (!canApproveRequests) {
-      setError("You don't have permission to reject requests")
-      return
-    }
-
-    try {
-      setError(null)
-
-      const { error: err } = await supabase
-        .from("leave_requests")
-        .update({
-          status: "rejected",
-          reviewed_at: new Date().toISOString(),
-        })
-        .eq("id", requestId)
-
-      if (err) throw err
-
-      await loadRequests()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to reject request")
-    }
-  }
-
-  /**
-   * Delete leave request
-   */
-  const handleDelete = async (requestId: string) => {
-    if (!canDeleteRequest) {
-      setError("You don't have permission to delete requests")
-      return
-    }
-
-    if (!window.confirm("Are you sure you want to delete this request?")) {
-      return
-    }
-
-    try {
-      setError(null)
-
-      const { error: err } = await supabase
-        .from("leave_requests")
-        .delete()
-        .eq("id", requestId)
-
-      if (err) throw err
-
-      await loadRequests()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to delete request")
-    }
-  }
-
-  const getStatusClass = (status: string) => {
-    const statusMap: Record<string, string> = {
-      pending: "status-pending",
-      approved: "status-approved",
-      rejected: "status-rejected",
-    }
-    return statusMap[status] || ""
-  }
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    console.log('Submit vacation request:', { ...formData, vacationType });
+    setIsDialogOpen(false);
+    setFormData({ startDate: '', endDate: '' });
+    setVacationType('');
+  };
 
   return (
-    <div>
-      <div className="content-header">
-        <h2 className="content-title">Leave Requests</h2>
-        <div className="content-actions">
-          {canCreateRequest && (
-            <button
-              className="btn-primary"
-              onClick={() => setShowForm(!showForm)}
-            >
-              {showForm ? "Cancel" : "+ New Request"}
-            </button>
-          )}
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl lg:text-3xl font-bold text-gray-900">{t('concedii')}</h1>
+          <p className="text-gray-500">{t('manageVacations')}</p>
         </div>
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <DialogTrigger asChild>
+            <Button className="gap-2">
+              <Plus className="w-4 h-4" />
+              Cerere Nouă
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <form onSubmit={handleSubmit}>
+              <DialogHeader>
+                <DialogTitle>Cerere Concediu Nou</DialogTitle>
+                <DialogDescription>
+                  Completează formularul pentru a solicita un nou concediu.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="type">Tip Concediu</Label>
+                  <Select value={vacationType} onValueChange={setVacationType}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selectează tipul" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {vacationTypes.map((type) => (
+                        <SelectItem key={type.value} value={type.value}>
+                          {type.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="startDate">Data Start</Label>
+                    <Input
+                      id="startDate"
+                      type="date"
+                      value={formData.startDate}
+                      onChange={(e) =>
+                        setFormData({ ...formData, startDate: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="endDate">Data Sfârșit</Label>
+                    <Input
+                      id="endDate"
+                      type="date"
+                      value={formData.endDate}
+                      onChange={(e) =>
+                        setFormData({ ...formData, endDate: e.target.value })
+                      }
+                    />
+                  </div>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsDialogOpen(false)}
+                >
+                  Anulează
+                </Button>
+                <Button type="submit">Trimite Cererea</Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
       </div>
 
-      {error && <div className="alert alert-error">{error}</div>}
-
-      {showForm && canCreateRequest && (
-        <div className="card" style={{ marginBottom: "20px" }}>
-          <h3>New Leave Request</h3>
-          <form onSubmit={handleCreateRequest} className="login-form">
-            <div className="form-grid">
-              <div className="form-group">
-                <label className="form-label">Start Date</label>
-                <input
-                  type="date"
-                  value={formData.start_date}
-                  onChange={(e) =>
-                    setFormData({ ...formData, start_date: e.target.value })
-                  }
-                  required
-                />
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-500">Total Zile Disponibile</p>
+                <p className="text-2xl font-bold text-gray-900">20</p>
               </div>
-              <div className="form-group">
-                <label className="form-label">End Date</label>
-                <input
-                  type="date"
-                  value={formData.end_date}
-                  onChange={(e) =>
-                    setFormData({ ...formData, end_date: e.target.value })
-                  }
-                  required
-                />
+              <Badge variant="info">Anual</Badge>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-500">Zile Folosite</p>
+                <p className="text-2xl font-bold text-gray-900">8</p>
               </div>
+              <Badge variant="gray">2024</Badge>
             </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-500">Cereri în Așteptare</p>
+                <p className="text-2xl font-bold text-gray-900">3</p>
+              </div>
+              <Badge variant="warning">Pending</Badge>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-500">Cereri Aprobate</p>
+                <p className="text-2xl font-bold text-gray-900">5</p>
+              </div>
+              <Badge variant="success">Aprobate</Badge>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
-            <div className="form-group">
-              <label className="form-label">Leave Type</label>
-              <select
-                value={formData.leave_type_id}
-                onChange={(e) =>
-                  setFormData({ ...formData, leave_type_id: e.target.value })
-                }
-              >
-                <option value="vacation">Vacation</option>
-                <option value="sick">Sick Leave</option>
-                <option value="unpaid">Unpaid Leave</option>
-              </select>
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">Reason</label>
-              <textarea
-                value={formData.reason}
-                onChange={(e) =>
-                  setFormData({ ...formData, reason: e.target.value })
-                }
-                placeholder="Optional reason for leave..."
-              />
-            </div>
-
-            <div className="modal-footer">
-              <button
-                type="button"
-                className="btn-secondary"
-                onClick={() => setShowForm(false)}
-              >
-                Cancel
-              </button>
-              <button type="submit" className="btn-primary" disabled={loading}>
-                {loading ? "Creating..." : "Create Request"}
-              </button>
-            </div>
-          </form>
+      {/* Tabs */}
+      <Tabs defaultValue="list" className="w-full">
+        <div className="flex items-center justify-between mb-4">
+          <TabsList>
+            <TabsTrigger value="list" className="gap-2">
+              <List className="w-4 h-4" />
+              Listă
+            </TabsTrigger>
+            <TabsTrigger value="calendar" className="gap-2">
+              <Calendar className="w-4 h-4" />
+              Calendar
+            </TabsTrigger>
+          </TabsList>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" className="gap-2">
+              <Filter className="w-4 h-4" />
+              Filtrează
+            </Button>
+            <Button variant="outline" size="sm" className="gap-2">
+              <Download className="w-4 h-4" />
+              Export
+            </Button>
+          </div>
         </div>
-      )}
 
-      {loading && <div className="loading"></div>}
-
-      {!loading && requests.length === 0 && (
-        <div className="empty-state">
-          <div className="empty-state-icon">📋</div>
-          <h3 className="empty-state-title">No leave requests</h3>
-          <p className="empty-state-description">
-            {canCreateRequest
-              ? "Create your first leave request to get started"
-              : "You don't have any leave requests yet"}
-          </p>
-        </div>
-      )}
-
-      {!loading && requests.length > 0 && (
-        <div className="table-container">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Employee</th>
-                <th>Start Date</th>
-                <th>End Date</th>
-                <th>Days</th>
-                <th>Type</th>
-                <th>Status</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {requests.map((req) => (
-                <tr key={req.id}>
-                  <td>{req.employee_id}</td>
-                  <td>{req.start_date}</td>
-                  <td>{req.end_date}</td>
-                  <td>{req.days}</td>
-                  <td>{req.leave_type_id}</td>
-                  <td>
-                    <span className={`table-status ${getStatusClass(req.status)}`}>
-                      {req.status}
-                    </span>
-                  </td>
-                  <td>
-                    {req.status === "pending" && canApproveRequests && (
-                      <div style={{ display: "flex", gap: "8px" }}>
-                        <button
-                          className="btn-success btn-small"
-                          onClick={() => handleApprove(req.id)}
+        <TabsContent value="list" className="mt-0">
+          <Card>
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Angajat</TableHead>
+                    <TableHead>Perioadă</TableHead>
+                    <TableHead>Tip</TableHead>
+                    <TableHead>Zile</TableHead>
+                    <TableHead>Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {mockVacations.map((vacation) => (
+                    <TableRow key={vacation.id}>
+                      <TableCell className="font-medium">
+                        {vacation.employee}
+                      </TableCell>
+                      <TableCell>
+                        {formatDate(vacation.startDate)} -{' '}
+                        {formatDate(vacation.endDate)}
+                      </TableCell>
+                      <TableCell>
+                        {vacationTypes.find((t) => t.value === vacation.type)
+                          ?.label || vacation.type}
+                      </TableCell>
+                      <TableCell>{vacation.days}</TableCell>
+                      <TableCell>
+                        <Badge
+                          className={getStatusColor(vacation.status)}
+                          variant="outline"
                         >
-                          Approve
-                        </button>
-                        <button
-                          className="btn-danger btn-small"
-                          onClick={() => handleReject(req.id)}
-                        >
-                          Reject
-                        </button>
-                      </div>
-                    )}
-                    {canDeleteRequest && (
-                      <button
-                        className="btn-danger btn-small"
-                        onClick={() => handleDelete(req.id)}
-                      >
-                        Delete
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+                          {vacation.status.charAt(0).toUpperCase() +
+                            vacation.status.slice(1)}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="calendar">
+          <Card>
+            <CardContent>
+              {/* placeholder calendar representation */}
+              <p className="text-center text-gray-500">Calendar view coming soon</p>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
-  )
-}
+  );
+};
+
+export default Vacations;

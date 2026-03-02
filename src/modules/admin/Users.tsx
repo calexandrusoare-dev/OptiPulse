@@ -1,517 +1,484 @@
-/**
- * OptiPulse Admin - Users Management Module
- * User lifecycle and permission assignment with RBAC
- */
+import React, { useState } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { Plus, User, Mail, Phone, Edit, Trash2, MoreVertical } from 'lucide-react';
+import { getStatusColor, departments, userRoles } from '@/lib/utils';
 
-import { useEffect, useState } from "react"
-import { useAuth } from "../../auth/AuthProvider"
-import { supabase } from "../../api/supabaseClient"
-import { canCreate, canEdit, canDelete } from "../../lib/rbac"
-import { UserWithPermissions, UserPermission } from "../../types"
+const mockUsers = [
+  {
+    id: 1,
+    name: 'John Doe',
+    email: 'john.doe@rocket.ro',
+    phone: '+40 721 234 567',
+    role: 'admin',
+    department: 'IT',
+    status: 'activ',
+    avatar: 'JD',
+  },
+  {
+    id: 2,
+    name: 'Maria Popescu',
+    email: 'maria.popescu@rocket.ro',
+    phone: '+40 721 234 568',
+    role: 'manager',
+    department: 'IT',
+    status: 'activ',
+    avatar: 'MP',
+  },
+  {
+    id: 3,
+    name: 'Ion Ionescu',
+    email: 'ion.ionescu@rocket.ro',
+    phone: '+40 721 234 569',
+    role: 'user',
+    department: 'Marketing',
+    status: 'activ',
+    avatar: 'II',
+  },
+  {
+    id: 4,
+    name: 'Ana Georgescu',
+    email: 'ana.georgescu@rocket.ro',
+    phone: '+40 721 234 570',
+    role: 'user',
+    department: 'Sales',
+    status: 'activ',
+    avatar: 'AG',
+  },
+  {
+    id: 5,
+    name: 'Elena Dumitrescu',
+    email: 'elena.dumitrescu@rocket.ro',
+    phone: '+40 721 234 571',
+    role: 'user',
+    department: 'HR',
+    status: 'inactiv',
+    avatar: 'ED',
+  },
+  {
+    id: 6,
+    name: 'George Popa',
+    email: 'george.popa@rocket.ro',
+    phone: '+40 721 234 572',
+    role: 'user',
+    department: 'Finance',
+    status: 'activ',
+    avatar: 'GP',
+  },
+];
 
-export default function Users() {
-  const { permissions } = useAuth()
-  const [users, setUsers] = useState<UserWithPermissions[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [showCreateForm, setShowCreateForm] = useState(false)
-  const [selectedUserForPermissions, setSelectedUserForPermissions] = useState<
-    string | null
-  >(null)
+const Users = () => {
+  const [users, setUsers] = useState(mockUsers);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState(null);
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    role: '',
+    department: '',
+    status: 'activ',
+  });
 
-  const moduleCode = "admin"
-  const canCreateUser = canCreate(permissions, moduleCode)
-  const canEditUser = canEdit(permissions, moduleCode)
-  const canDeleteUser = canDelete(permissions, moduleCode)
-
-  const [createFormData, setCreateFormData] = useState({
-    email: "",
-    password: "",
-    full_name: "",
-  })
-
-  const [availablePermissions, setAvailablePermissions] = useState<
-    {
-      id: string
-      module_code: string
-      permission_code: string
-      name: string
-    }[]
-  >([])
-
-  /**
-   * Load all users and their permissions
-   */
-  const loadUsers = async () => {
-    try {
-      setError(null)
-      setLoading(true)
-
-      // Get users from auth
-      const { data: authUsers, error: authError } =
-        await supabase.auth.admin.listUsers()
-
-      if (authError) throw authError
-
-      // Get permissions for each user
-      const usersWithPermissions: UserWithPermissions[] = await Promise.all(
-        authUsers.users.map(async (u) => {
-          const { data: perms } = await supabase
-            .from("v_user_permissions")
-            .select("*")
-            .eq("user_id", u.id)
-
-          return {
-            id: u.id,
-            email: u.email || "",
-            full_name: u.user_metadata?.full_name || "",
-            permissions: (perms as UserPermission[]) || [],
-            is_active: u.email_confirmed_at !== null,
-          }
-        })
-      )
-
-      setUsers(usersWithPermissions)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load users")
-      console.error("Load error:", err)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  /**
-   * Load available permissions from database
-   */
-  const loadAvailablePermissions = async () => {
-    try {
-      // Query module_permission_definitions joined with modules and permissions
-      const { data, error: err } = await supabase
-        .from("module_permission_definitions")
-        .select(
-          `
-          *,
-          modules:module_id(code),
-          permissions:permission_id(code, name)
-        `
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (editingUser) {
+      setUsers(
+        users.map((u) =>
+          u.id === editingUser.id
+            ? { ...u, ...formData, avatar: formData.name.split(' ').map(n => n[0]).join('').toUpperCase() }
+            : u
         )
-
-      if (err) throw err
-
-      const formattedPerms = (data || []).map((item: any) => ({
-        id: `${item.module_id}-${item.permission_id}`,
-        module_code: item.modules?.code || "",
-        permission_code: item.permissions?.code || "",
-        name: item.permissions?.name || "",
-      }))
-
-      setAvailablePermissions(formattedPerms)
-    } catch (err) {
-      console.error("Failed to load permissions:", err)
-    }
-  }
-
-  useEffect(() => {
-    loadUsers()
-    loadAvailablePermissions()
-  }, [])
-
-  /**
-   * Create new user
-   */
-  const handleCreateUser = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
-
-    if (!createFormData.email || !createFormData.password) {
-      setError("Email and password are required")
-      return
-    }
-
-    try {
-      setError(null)
-      setLoading(true)
-
-      // Create auth user
-      const { data, error: authError } = await supabase.auth.admin.createUser({
-        email: createFormData.email,
-        password: createFormData.password,
-        user_metadata: {
-          full_name: createFormData.full_name,
+      );
+    } else {
+      setUsers([
+        ...users,
+        {
+          ...formData,
+          id: users.length + 1,
+          avatar: formData.name.split(' ').map(n => n[0]).join('').toUpperCase(),
         },
-        email_confirm: false,
-      })
-
-      if (authError) throw authError
-
-      if (data.user) {
-        // Link to business user table (if using)
-        await supabase.from("users").insert({
-          id: data.user.id,
-          email: createFormData.email,
-          full_name: createFormData.full_name,
-          is_active: true,
-        })
-      }
-
-      setCreateFormData({
-        email: "",
-        password: "",
-        full_name: "",
-      })
-      setShowCreateForm(false)
-      await loadUsers()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create user")
-      console.error("Create error:", err)
-    } finally {
-      setLoading(false)
+      ]);
     }
-  }
+    setIsDialogOpen(false);
+    setEditingUser(null);
+    setFormData({
+      name: '',
+      email: '',
+      phone: '',
+      role: '',
+      department: '',
+      status: 'activ',
+    });
+  };
 
-  /**
-   * Grant permission to user
-   */
-  const handleGrantPermission = async (
-    userId: string,
-    moduleCode: string,
-    permissionCode: string
-  ) => {
-    try {
-      setError(null)
+  const handleEdit = (user) => {
+    setEditingUser(user);
+    setFormData({
+      name: user.name,
+      email: user.email,
+      phone: user.phone,
+      role: user.role,
+      department: user.department,
+      status: user.status,
+    });
+    setIsDialogOpen(true);
+  };
 
-      // Get module and permission IDs
-      const { data: modules } = await supabase
-        .from("modules")
-        .select("id")
-        .eq("code", moduleCode)
-        .single()
-
-      const { data: perms } = await supabase
-        .from("permissions")
-        .select("id")
-        .eq("code", permissionCode)
-        .single()
-
-      if (!modules || !perms) {
-        throw new Error("Module or permission not found")
-      }
-
-      // Insert permission
-      const { error: err } = await supabase
-        .from("user_permissions")
-        .insert({
-          user_id: userId,
-          module_id: modules.id,
-          permission_id: perms.id,
-        })
-
-      if (err) throw err
-
-      await loadUsers()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to grant permission")
+  const handleDelete = (id) => {
+    if (confirm('Ești sigur că vrei să ștergi acest angajat?')) {
+      setUsers(users.filter((u) => u.id !== id));
     }
-  }
+  };
 
-  /**
-   * Revoke permission from user
-   */
-  const handleRevokePermission = async (
-    userId: string,
-    moduleCode: string,
-    permissionCode: string
-  ) => {
-    try {
-      setError(null)
+  const toggleStatus = (id) => {
+    setUsers(
+      users.map((u) =>
+        u.id === id ? { ...u, status: u.status === 'activ' ? 'inactiv' : 'activ' } : u
+      )
+    );
+  };
 
-      // Get module and permission IDs
-      const { data: modules } = await supabase
-        .from("modules")
-        .select("id")
-        .eq("code", moduleCode)
-        .single()
-
-      const { data: perms } = await supabase
-        .from("permissions")
-        .select("id")
-        .eq("code", permissionCode)
-        .single()
-
-      if (!modules || !perms) {
-        throw new Error("Module or permission not found")
-      }
-
-      // Delete permission
-      const { error: err } = await supabase
-        .from("user_permissions")
-        .delete()
-        .eq("user_id", userId)
-        .eq("module_id", modules.id)
-        .eq("permission_id", perms.id)
-
-      if (err) throw err
-
-      await loadUsers()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to revoke permission")
-    }
-  }
-
-  /**
-   * Delete user
-   */
-  const handleDeleteUser = async (userId: string) => {
-    if (!window.confirm("Are you sure you want to delete this user?")) return
-
-    try {
-      setError(null)
-
-      const { error: err } = await supabase.auth.admin.deleteUser(userId)
-
-      if (err) throw err
-
-      await loadUsers()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to delete user")
-    }
-  }
-
-  const userModules = Array.from(
-    new Set(selectedUserForPermissions ? 
-      users.find(u => u.id === selectedUserForPermissions)?.permissions.map(p => p.module_code) || [] :
-      []
-    )
-  )
+  const activeUsers = users.filter((u) => u.status === 'activ').length;
+  const adminUsers = users.filter((u) => u.role === 'admin').length;
+  const managerUsers = users.filter((u) => u.role === 'manager').length;
 
   return (
-    <div>
-      <div className="content-header">
-        <h2 className="content-title">User Management</h2>
-        <div className="content-actions">
-          {canCreateUser && (
-            <button
-              className="btn-primary"
-              onClick={() => setShowCreateForm(!showCreateForm)}
-            >
-              {showCreateForm ? "Cancel" : "+ New User"}
-            </button>
-          )}
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl lg:text-3xl font-bold text-gray-900">Administrare</h1>
+          <p className="text-gray-500">Gestionează angajații și permisiunile</p>
         </div>
+        <Dialog open={isDialogOpen} onOpenChange={(open) => {
+          setIsDialogOpen(open);
+          if (!open) {
+            setEditingUser(null);
+            setFormData({
+              name: '',
+              email: '',
+              phone: '',
+              role: '',
+              department: '',
+              status: 'activ',
+            });
+          }
+        }}>
+          <DialogTrigger asChild>
+            <Button className="gap-2">
+              <Plus className="w-4 h-4" />
+              Adaugă Angajat
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <form onSubmit={handleSubmit}>
+              <DialogHeader>
+                <DialogTitle>
+                  {editingUser ? 'Editează Angajat' : 'Angajat Nou'}
+                </DialogTitle>
+                <DialogDescription>
+                  {editingUser
+                    ? 'Modifică informațiile angajatului.'
+                    : 'Completează datele pentru a adăuga un nou angajat.'}
+                </DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="name">Nume Complet</Label>
+                  <Input
+                    id="name"
+                    placeholder="Ex: Ion Popescu"
+                    value={formData.name}
+                    onChange={(e) =>
+                      setFormData({ ...formData, name: e.target.value })
+                    }
+                    required
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="email">Email</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="ion.popescu@rocket.ro"
+                    value={formData.email}
+                    onChange={(e) =>
+                      setFormData({ ...formData, email: e.target.value })
+                    }
+                    required
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="phone">Telefon</Label>
+                  <Input
+                    id="phone"
+                    type="tel"
+                    placeholder="+40 721 234 567"
+                    value={formData.phone}
+                    onChange={(e) =>
+                      setFormData({ ...formData, phone: e.target.value })
+                    }
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="role">Rol</Label>
+                    <Select
+                      value={formData.role}
+                      onValueChange={(value) =>
+                        setFormData({ ...formData, role: value })
+                      }
+                      required
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selectează rolul" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {userRoles.map((role) => (
+                          <SelectItem key={role.value} value={role.value}>
+                            {role.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="department">Departament</Label>
+                    <Select
+                      value={formData.department}
+                      onValueChange={(value) =>
+                        setFormData({ ...formData, department: value })
+                      }
+                      required
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selectează dept." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {departments.map((dept) => (
+                          <SelectItem key={dept.value} value={dept.value}>
+                            {dept.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                {editingUser && (
+                  <div className="grid gap-2">
+                    <Label htmlFor="status">Status</Label>
+                    <Select
+                      value={formData.status}
+                      onValueChange={(value) =>
+                        setFormData({ ...formData, status: value })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selectează statusul" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="activ">Activ</SelectItem>
+                        <SelectItem value="inactiv">Inactiv</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </div>
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsDialogOpen(false)}
+                >
+                  Anulează
+                </Button>
+                <Button type="submit">
+                  {editingUser ? 'Salvează' : 'Adaugă'}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
       </div>
 
-      {error && <div className="alert alert-error">{error}</div>}
-
-      {showCreateForm && canCreateUser && (
-        <div className="card" style={{ marginBottom: "20px" }}>
-          <h3>Create New User</h3>
-          <form onSubmit={handleCreateUser} className="login-form">
-            <div className="form-grid">
-              <div className="form-group">
-                <label className="form-label">Email</label>
-                <input
-                  type="email"
-                  value={createFormData.email}
-                  onChange={(e) =>
-                    setCreateFormData({
-                      ...createFormData,
-                      email: e.target.value,
-                    })
-                  }
-                  required
-                />
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-500">Total Angajați</p>
+                <p className="text-2xl font-bold text-gray-900">{users.length}</p>
               </div>
-              <div className="form-group">
-                <label className="form-label">Password</label>
-                <input
-                  type="password"
-                  value={createFormData.password}
-                  onChange={(e) =>
-                    setCreateFormData({
-                      ...createFormData,
-                      password: e.target.value,
-                    })
-                  }
-                  required
-                />
+              <div className="p-3 rounded-lg bg-primary/10">
+                <User className="w-6 h-6 text-primary" />
               </div>
             </div>
-
-            <div className="form-group">
-              <label className="form-label">Full Name</label>
-              <input
-                type="text"
-                value={createFormData.full_name}
-                onChange={(e) =>
-                  setCreateFormData({
-                    ...createFormData,
-                    full_name: e.target.value,
-                  })
-                }
-              />
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-500">Administratori</p>
+                <p className="text-2xl font-bold text-gray-900">{adminUsers}</p>
+              </div>
+              <div className="p-3 rounded-lg bg-red-100">
+                <User className="w-6 h-6 text-red-600" />
+              </div>
             </div>
-
-            <div className="modal-footer">
-              <button
-                type="button"
-                className="btn-secondary"
-                onClick={() => setShowCreateForm(false)}
-              >
-                Cancel
-              </button>
-              <button type="submit" className="btn-primary" disabled={loading}>
-                {loading ? "Creating..." : "Create User"}
-              </button>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-500">Manageri</p>
+                <p className="text-2xl font-bold text-gray-900">{managerUsers}</p>
+              </div>
+              <div className="p-3 rounded-lg bg-blue-100">
+                <User className="w-6 h-6 text-blue-600" />
+              </div>
             </div>
-          </form>
-        </div>
-      )}
+          </CardContent>
+        </Card>
+      </div>
 
-      {loading && <div className="loading"></div>}
-
-      {!loading && users.length === 0 && (
-        <div className="empty-state">
-          <div className="empty-state-icon">👥</div>
-          <h3 className="empty-state-title">No users found</h3>
-          <p className="empty-state-description">
-            {canCreateUser ? "Create your first user" : "No users exist"}
-          </p>
-        </div>
-      )}
-
-      {!loading && users.length > 0 && (
-        <>
-          <div className="table-container" style={{ marginBottom: "20px" }}>
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Email</th>
-                  <th>Full Name</th>
-                  <th>Status</th>
-                  <th>Permissions</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {users.map((user) => (
-                  <tr key={user.id}>
-                    <td>{user.email}</td>
-                    <td>{user.full_name || "-"}</td>
-                    <td>
-                      <span
-                        className={`table-status ${
-                          user.is_active ? "status-active" : "status-inactive"
-                        }`}
-                      >
-                        {user.is_active ? "Active" : "Inactive"}
-                      </span>
-                    </td>
-                    <td>
-                      <button
-                        className="btn-primary btn-small"
-                        onClick={() =>
-                          setSelectedUserForPermissions(
-                            selectedUserForPermissions === user.id
-                              ? null
-                              : user.id
-                          )
-                        }
-                      >
-                        {user.permissions.length} permissions
-                      </button>
-                    </td>
-                    <td>
-                      {canDeleteUser && (
-                        <button
-                          className="btn-danger btn-small"
-                          onClick={() => handleDeleteUser(user.id)}
-                        >
-                          Delete
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {selectedUserForPermissions && canEditUser && (
-            <div className="card">
-              <h3>Manage Permissions</h3>
-              <p style={{ marginBottom: "16px", color: "var(--gray-600)" }}>
-                User: <strong>{users.find(u => u.id === selectedUserForPermissions)?.email}</strong>
-              </p>
-
-              <div style={{ marginBottom: "16px" }}>
-                <h4 style={{ marginBottom: "12px" }}>Available Permissions</h4>
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
-                    gap: "12px",
-                  }}
-                >
-                  {availablePermissions.map((perm) => {
-                    const hasPermission = users
-                      .find(u => u.id === selectedUserForPermissions)
-                      ?.permissions.some(
-                        (p) =>
-                          p.module_code === perm.module_code &&
-                          p.permission_code === perm.permission_code
-                      )
-
-                    return (
-                      <div
-                        key={perm.id}
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          padding: "12px",
-                          border: "1px solid var(--gray-200)",
-                          borderRadius: "6px",
-                          backgroundColor: hasPermission
-                            ? "var(--primary-light)"
-                            : "var(--gray-50)",
-                        }}
-                      >
-                        <button
-                          className={
-                            hasPermission ? "btn-danger btn-small" : "btn-success btn-small"
-                          }
-                          onClick={() =>
-                            hasPermission
-                              ? handleRevokePermission(
-                                  selectedUserForPermissions,
-                                  perm.module_code,
-                                  perm.permission_code
-                                )
-                              : handleGrantPermission(
-                                  selectedUserForPermissions,
-                                  perm.module_code,
-                                  perm.permission_code
-                                )
-                          }
-                          style={{ marginRight: "8px" }}
-                        >
-                          {hasPermission ? "✓" : "+"}
-                        </button>
-                        <div>
-                          <div style={{ fontSize: "14px", fontWeight: "600" }}>
-                            {perm.module_code}
-                          </div>
-                          <div style={{ fontSize: "12px", color: "var(--gray-600)" }}>
-                            {perm.permission_code}
-                          </div>
-                        </div>
+      {/* Users Table */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Lista Angajaților</CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Angajat</TableHead>
+                <TableHead>Contact</TableHead>
+                <TableHead>Rol</TableHead>
+                <TableHead>Departament</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Acțiuni</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {users.map((user) => (
+                <TableRow key={user.id}>
+                  <TableCell>
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                        <span className="text-sm font-medium text-primary">
+                          {user.avatar}
+                        </span>
                       </div>
-                    )
-                  })}
-                </div>
-              </div>
-            </div>
-          )}
-        </>
-      )}
+                      <span className="font-medium text-gray-900">{user.name}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2 text-sm text-gray-500">
+                        <Mail className="w-3 h-3" />
+                        {user.email}
+                      </div>
+                      <div className="flex items-center gap-2 text-sm text-gray-500">
+                        <Phone className="w-3 h-3" />
+                        {user.phone}
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <Badge
+                      variant={
+                        user.role === 'admin'
+                          ? 'destructive'
+                          : user.role === 'manager'
+                          ? 'default'
+                          : 'secondary'
+                      }
+                    >
+                      {userRoles.find((r) => r.value === user.role)?.label}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    {departments.find((d) => d.value === user.department)?.label ||
+                      user.department}
+                  </TableCell>
+                  <TableCell>
+                    <Badge
+                      className={getStatusColor(user.status)}
+                      variant="outline"
+                    >
+                      {user.status === 'activ' ? 'Activ' : 'Inactiv'}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleEdit(user)}
+                      >
+                        <Edit className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => toggleStatus(user.id)}
+                        className={
+                          user.status === 'activ'
+                            ? 'text-orange-600'
+                            : 'text-green-600'
+                        }
+                        title={user.status === 'activ' ? 'Inactivează' : 'Activează'}
+                      >
+                        {user.status === 'activ' ? '⊘' : '✓'}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleDelete(user.id)}
+                        className="text-red-600 hover:text-red-700"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
     </div>
-  )
-}
+  );
+};
+
+export default Users;
