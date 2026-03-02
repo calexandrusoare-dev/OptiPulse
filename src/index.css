@@ -5,10 +5,10 @@
 
 /* CSS Variables - Design Tokens */
 :root {
-  /* Primary Colors */
-  --primary-color: #2563eb;
-  --primary-light: #dbeafe;
-  --primary-dark: #1e40af;
+  /* Primary Colors (switched to red theme) */
+  --primary-color: #dc2626;          /* bright red */
+  --primary-light: #fee2e2;         /* pale red background */
+  --primary-dark: #991b1b;          /* deep red for sidebar/header */
 
   /* Secondary Colors */
   --success-color: #16a34a;
@@ -33,7 +33,7 @@
 
   /* Backgrounds */
   --bg-primary: var(--white);
-  --bg-secondary: var(--gray-50);
+  --bg-secondary: var(--white);
   --bg-tertiary: var(--gray-100);
 
   /* Shadows */
@@ -288,8 +288,8 @@ textarea {
   box-shadow: var(--shadow-sm);
   border: 1px solid var(--gray-200);
   padding: var(--spacing-6);
-  transition: all 0.2s ease;
-}
+  transition: all 0.2s ease;  margin: var(--spacing-6) auto;        /* centre cards horizontally */
+  max-width: 800px;}
 
 .card:hover {
   box-shadow: var(--shadow-md);
@@ -451,7 +451,7 @@ tbody tr:last-child td {
 
 .main-sidebar {
   grid-row: 1 / -1;
-  background: var(--gray-800);
+  background: var(--primary-dark);
   color: var(--white);
   padding: var(--spacing-6);
   border-right: 1px solid var(--gray-700);

@@ -1,0 +1,47 @@
+// EXEMPLU: versiune ÎMBUNĂTĂȚITĂ (nu înlocui încă)
+import React, { PropsWithChildren } from 'react';
+
+interface CardProps {
+  className?: string;
+  variant?: 'default' | 'elevated' | 'outlined';  // Opțiuni
+  padding?: 'sm' | 'md' | 'lg';                   // Control padding
+}
+
+export const CardEnhanced: React.FC<PropsWithChildren<CardProps>> = ({
+  children,
+  className,
+  variant = 'default',
+  padding = 'md',
+}) => {
+  // Clase dinamice bazate pe props
+  const variantClass = {
+    default: 'card',
+    elevated: 'card card--elevated',
+    outlined: 'card card--outlined',
+  }[variant];
+
+  const paddingClass = {
+    sm: 'p-4',
+    md: 'p-6',
+    lg: 'p-8',
+  }[padding];
+
+  return (
+    <div className={`${variantClass} ${paddingClass} ${className || ''}`}>
+      {children}
+    </div>
+  );
+};
+
+// Apoi în CSS adaugă:
+/**
+.card--elevated {
+  box-shadow: var(--shadow-lg);
+  border: none;
+}
+
+.card--outlined {
+  border: 2px solid var(--primary-color);
+  box-shadow: none;
+}
+*/

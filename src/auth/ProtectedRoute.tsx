@@ -4,8 +4,9 @@
  */
 
 
-import React from "react";
+import React, { ReactNode } from "react";
 import { Navigate, useLocation } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "./AuthProvider";
 import { hasModuleAccess } from "../lib/rbac";
 
@@ -50,6 +51,8 @@ export default function ProtectedRoute({
  * Displayed when user lacks required permissions
  */
 export function UnauthorizedPage(): ReactNode {
+  const { t } = useTranslation();
+
   return (
     <div
       style={{
@@ -62,13 +65,13 @@ export function UnauthorizedPage(): ReactNode {
         backgroundColor: "#f3f4f6",
       }}
     >
-      <h1>Access Denied</h1>
-      <p>You do not have permission to access this resource.</p>
+      <h1>{t('accessDenied')}</h1>
+      <p>{t('accessDeniedMessage')}</p>
       <p style={{ fontSize: "14px", color: "#666" }}>
         Contact your administrator if you believe this is an error.
       </p>
       <a href="/" style={{ marginTop: "20px", color: "#3b82f6" }}>
-        ← Back to Dashboard
+        {t('backToDashboard')}
       </a>
     </div>
   )

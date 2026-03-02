@@ -5,18 +5,20 @@
 
 import { useState } from "react"
 import { Link, useNavigate, useLocation } from "react-router-dom"
+import { useTranslation } from "react-i18next"
 import { useAuth } from "../auth/AuthProvider"
 import { supabase } from "../api/supabaseClient"
 import { getUserModules } from "../lib/rbac"
 
 interface NavItem {
-  label: string
+  labelKey: string
   to: string
   module: string
   icon?: string
 }
 
 export default function Sidebar() {
+  const { t } = useTranslation()
   const { permissions } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
@@ -27,25 +29,25 @@ export default function Sidebar() {
   const navItems: NavItem[] = [
     // HR Module
     {
-      label: "Cereri Concediu",
+      labelKey: "navLeaveRequests",
       to: "/hr/leave-requests",
       module: "hr",
       icon: "📋",
     },
     {
-      label: "Planificare Concediu",
+      labelKey: "navLeavePlanning",
       to: "/hr/leave-planning",
       module: "hr",
       icon: "📅",
     },
     {
-      label: "Ore Suplimentare",
+      labelKey: "navOvertime",
       to: "/hr/overtime",
       module: "hr",
       icon: "⏰",
     },
     {
-      label: "Ore Lucru",
+      labelKey: "navTimeEntries",
       to: "/hr/time-entries",
       module: "hr",
       icon: "🕐",
@@ -53,19 +55,19 @@ export default function Sidebar() {
 
     // Finance Module
     {
-      label: "Cheltuieli",
+      labelKey: "navExpenses",
       to: "/finance/expenses",
       module: "finance",
       icon: "💰",
     },
     {
-      label: "Bugete",
+      labelKey: "navBudgets",
       to: "/finance/budgets",
       module: "finance",
       icon: "📊",
     },
     {
-      label: "KPI",
+      labelKey: "navKPI",
       to: "/finance/kpi",
       module: "finance",
       icon: "📈",
@@ -73,7 +75,7 @@ export default function Sidebar() {
 
     // Admin Module
     {
-      label: "Utilizatori",
+      labelKey: "navUsers",
       to: "/admin/users",
       module: "admin",
       icon: "👥",
@@ -104,10 +106,10 @@ export default function Sidebar() {
 
   const isActive = (path: string) => location.pathname === path
 
-  // Group nav items by module
+  // Group nav items by module. If userModules is empty (e.g. not loaded yet), fall back to showing everything.
   const groupedItems: Record<string, NavItem[]> = {}
   navItems.forEach((item) => {
-    if (userModules.includes(item.module)) {
+    if (userModules.length === 0 || userModules.includes(item.module)) {
       if (!groupedItems[item.module]) {
         groupedItems[item.module] = []
       }
@@ -116,9 +118,9 @@ export default function Sidebar() {
   })
 
   const moduleNames: Record<string, string> = {
-    hr: "Resurse Umane",
-    finance: "Finanțe",
-    admin: "Administrație",
+    hr: t('hrModule'),
+    finance: t('financeModule'),
+    admin: t('adminModule'),
   }
 
   return (
@@ -138,7 +140,7 @@ export default function Sidebar() {
                 className={`sidebar-item ${isActive(item.to) ? "active" : ""}`}
               >
                 <span>{item.icon || "•"}</span>
-                <span>{item.label}</span>
+                <span>{t(item.labelKey)}</span>
               </Link>
             ))}
           </div>

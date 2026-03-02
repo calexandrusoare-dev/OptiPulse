@@ -51,7 +51,7 @@ const recentActivity = [
   {
     id: 1,
     type: 'vacation',
-    title: 'Cerere concediu aprobată',
+    titleKey: 'activityVacationApproved',
     description: 'Concediu de odihnă - 15-19 Aprilie',
     time: '2 ore în urmă',
     status: 'aprobat',
@@ -59,7 +59,7 @@ const recentActivity = [
   {
     id: 2,
     type: 'timesheet',
-    title: 'Pontaj săptămâna curentă',
+    titleKey: 'taskVacationApproval',
     description: '38 ore înregistrate',
     time: '5 ore în urmă',
     status: 'trimis',
@@ -67,7 +67,7 @@ const recentActivity = [
   {
     id: 3,
     type: 'expense',
-    title: 'Decont depus',
+    titleKey: 'activityExpenseApproved',
     description: 'Călătorie business - €450',
     time: '1 zi în urmă',
     status: 'pending',
@@ -75,7 +75,7 @@ const recentActivity = [
   {
     id: 4,
     type: 'budget',
-    title: 'Buget departament actualizat',
+    titleKey: 'taskBudgetAlert',
     description: 'Buget IT: €12,000 / €15,000',
     time: '2 zile în urmă',
     status: 'active',
@@ -85,21 +85,21 @@ const recentActivity = [
 const pendingTasks = [
   {
     id: 1,
-    title: 'Aprobare concediu angajat',
+    titleKey: 'taskVacationApproval',
     department: 'IT',
     requester: 'Maria Popescu',
     days: 5,
   },
   {
     id: 2,
-    title: 'Review pontaj săptămâna 12',
+    titleKey: 'taskExpenseReview',
     department: 'Marketing',
     requester: 'Ion Ionescu',
     status: 'pending',
   },
   {
     id: 3,
-    title: 'Decont cheltuieli transport',
+    titleKey: 'taskBudgetAlert',
     department: 'Sales',
     requester: 'Ana Georgescu',
     amount: '€120',
@@ -165,7 +165,7 @@ const Dashboard = () => {
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium text-gray-900">{activity.title}</p>
+                    <p className="font-medium text-gray-900">{t(activity.titleKey)}</p>
                     <p className="text-sm text-gray-500">{activity.description}</p>
                   </div>
                   <span className="text-xs text-gray-400 whitespace-nowrap">
@@ -193,7 +193,7 @@ const Dashboard = () => {
                   className="p-4 rounded-lg border border-gray-100 hover:border-primary/20 hover:bg-primary/5 transition-colors cursor-pointer"
                 >
                   <div className="flex items-start justify-between mb-2">
-                    <p className="font-medium text-gray-900 text-sm">{task.title}</p>
+                    <p className="font-medium text-gray-900 text-sm">{t(task.titleKey)}</p>
                     <Badge variant="warning">Nou</Badge>
                   </div>
                   <div className="flex items-center gap-2 text-xs text-gray-500">

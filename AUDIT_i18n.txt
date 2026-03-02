@@ -1,0 +1,62 @@
+/**
+ * AUDIT i18n - Stringuri care necesita traducere
+ * ===============================================
+ * 
+ * FORMAT:
+ * [FIȘIER] | LINIE | STRING ACTUAL | STATUS | TRADUCERE RO | TRADUCERE EN
+ */
+
+// ✅ DEJA TRADUSE (în locales/*/translation.json)
+- appTitle ✓
+- dashboard ✓
+- dashboardSubtitle ✓
+- concedii ✓
+- manageVacations ✓
+
+// ❌ HARD-CODED (trebuie MUTATE în translation.json)
+
+1. src/pages/Dashboard.tsx:54-63
+   ❌ "Cerere concediu aprobată"
+      → RO: "Cerere concediu aprobată" | EN: "Vacation request approved"
+   
+   ❌ "Concediu de odihnă - 15-19 Aprilie"
+      → RO: exact | EN: "Rest Leave - April 15-19"
+   
+   ❌ "Pontaj săptămâna curentă"
+      → RO: exact | EN: "Current week timesheet"
+   
+   ❌ "38 ore înregistrate"
+      → RO: exact | EN: "38 hours logged"
+
+2. src/pages/Dashboard.tsx:88-109
+   ❌ "Aprobare concediu angajat"
+      → RO: exact | EN: "Employee vacation approval"
+   
+   ❌ "Review pontaj săptămâna 12"
+      → RO: exact | EN: "Timesheet week 12 review"
+   
+   ❌ "Decont cheltuieli transport"
+      → RO: exact | EN: "Travel expense claim"
+
+3. src/modules/finance/ExpenseRequests.tsx:161
+   ❌ "Gestionează cheltuielile și cererile de rambursare"
+      → RO: exact | EN: "Manage expenses and reimbursement requests"
+
+4. src/auth/ProtectedRoute.tsx:71
+   ❌ "← Back to Dashboard"
+      → RO: "← Înapoi la Dashboard" | EN: "← Back to Dashboard"
+
+5. src/layout/Sidebar.tsx
+   ❌ "Cereri Concediu" → RO | EN: "Vacation Requests"
+   ❌ "Planificare Concediu" → EN: "Vacation Planning"
+   ❌ "Ore Suplimentare" → EN: "Overtime"
+   ... și alte module
+
+// TERMENI CARE RĂMÂN ACEIAȘI:
+- "Marketing" ✓ (rămâne "Marketing" în RO și EN)
+- "Sales" ✓ (rămâne în ambele)
+- "IT" ✓ (rămâne în ambele)
+- Nume de persoane (Maria, Ion, etc.) ✓
+
+// REGULĂ: Dacă e Noun Propriu (departament, persoană), rămâne la fel
+//         Dacă e action/description, TREBUIE tradus
