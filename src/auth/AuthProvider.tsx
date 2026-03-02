@@ -35,6 +35,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [loading, setLoading] = useState(true)
 
   /**
+   * Refresh user permissions on demand
+   * Useful when permissions are added/modified after user login
+   */
+  const refreshPermissions = async (): Promise<void> => {
+    if (!session?.user?.id) {
+      console.warn("Cannot refresh permissions: no active session")
+      return
+    }
+    await loadPermissions(session.user.id)
+  }
+
+  /**
    * Load user permissions from v_user_permissions view
    * This view returns normalized permissions: user_id, module_code, permission_code
    */
@@ -166,6 +178,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     user,
     permissions,
     loading,
+    refreshPermissions,
   }
 
   return (

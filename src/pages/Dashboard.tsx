@@ -3,14 +3,25 @@
  * Welcome and quick navigation
  */
 
+import { useState } from "react"
 import { useAuth } from "../auth/AuthProvider"
 import { getUserModules, getPermissionMatrix } from "../lib/rbac"
 
 export default function Dashboard() {
-  const { user, permissions } = useAuth()
+  const { user, permissions, refreshPermissions } = useAuth()
+  const [refreshing, setRefreshing] = useState(false)
 
   const userModules = getUserModules(permissions)
   const permissionMatrix = getPermissionMatrix(permissions)
+
+  const handleRefreshPermissions = async () => {
+    setRefreshing(true)
+    try {
+      await refreshPermissions()
+    } finally {
+      setRefreshing(false)
+    }
+  }
 
   const moduleIcons: Record<string, string> = {
     hr: "👥",
@@ -32,8 +43,26 @@ export default function Dashboard() {
 
   return (
     <div>
-      <div className="content-header">
+      <div className="content-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <h2 className="content-title">Welcome, {user?.full_name || user?.email}</h2>
+        <button
+          onClick={handleRefreshPermissions}
+          disabled={refreshing}
+          title="Refresh permissions from server"
+          style={{
+            padding: "8px 12px",
+            backgroundColor: refreshing ? "var(--gray-400)" : "var(--primary-color)",
+            color: "white",
+            border: "none",
+            borderRadius: "4px",
+            cursor: refreshing ? "not-allowed" : "pointer",
+            fontSize: "12px",
+            fontWeight: "600",
+            opacity: refreshing ? 0.6 : 1,
+          }}
+        >
+          {refreshing ? "Refreshing..." : "🔄"}
+        </button>
       </div>
 
       <div
@@ -75,6 +104,24 @@ export default function Dashboard() {
             >
               {JSON.stringify(permissions, null, 2)}
             </pre>
+            <button
+              onClick={handleRefreshPermissions}
+              disabled={refreshing}
+              style={{
+                marginTop: "12px",
+                padding: "8px 16px",
+                backgroundColor: "var(--primary-color)",
+                color: "white",
+                border: "none",
+                borderRadius: "4px",
+                cursor: refreshing ? "not-allowed" : "pointer",
+                opacity: refreshing ? 0.6 : 1,
+                fontSize: "12px",
+                fontWeight: "600",
+              }}
+            >
+              {refreshing ? "Refreshing..." : "🔄 Refresh Permissions"}
+            </button>
           </div>
         </div>
       )}

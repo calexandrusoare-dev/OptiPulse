@@ -72,6 +72,7 @@ export interface AuthContextType {
   user: User | null
   permissions: UserPermission[]
   loading: boolean
+  refreshPermissions: () => Promise<void>
 }
 
 /**
