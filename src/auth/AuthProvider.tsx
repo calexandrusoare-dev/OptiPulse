@@ -35,6 +35,20 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [loading, setLoading] = useState(true)
 
   /**
+   * Helper to check if error is due to expired session
+   */
+  const isSessionExpiredError = (error: any): boolean => {
+    if (!error) return false
+    const message = error?.message?.toLowerCase() || ""
+    return (
+      message.includes("invalid jwt") ||
+      message.includes("expired") ||
+      message.includes("unauthorized") ||
+      error?.status === 401
+    )
+  }
+
+  /**
    * Refresh user permissions on demand
    * Useful when permissions are added/modified after user login
    */
@@ -43,22 +57,54 @@ export function AuthProvider({ children }: AuthProviderProps) {
       console.warn("Cannot refresh permissions: no active session")
       return
     }
-    await loadPermissions(session.user.id)
+    try {
+      await loadPermissions(session.user.id)
+    } catch (err) {
+      console.error("Error refreshing permissions:", err)
+      if (isSessionExpiredError(err)) {
+        // Session expired, force logout
+        try {
+          await supabase.auth.signOut()
+        } catch {
+          // ignore
+        }
+        setSession(null)
+        setUser(null)
+        setPermissions([])
+      }
+    }
   }
 
   /**
    * Load user permissions from v_user_permissions view
    * This view returns normalized permissions: user_id, module_code, permission_code
+   * Includes timeout to prevent indefinite hanging
    */
   const loadPermissions = async (userId: string): Promise<void> => {
     try {
-      const { data, error } = await supabase
+      // Set a timeout for the query (5s)
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(
+          () => reject(new Error("Permission query timeout")),
+          5000
+        )
+      )
+
+      const queryPromise = supabase
         .from("v_user_permissions")
         .select("user_id, module_code, permission_code")
         .eq("user_id", userId)
 
+      const { data, error } = await Promise.race([
+        queryPromise,
+        timeoutPromise,
+      ]) as any
+
       if (error) {
         console.error("Failed to load permissions:", error)
+        if (isSessionExpiredError(error)) {
+          throw error
+        }
         setPermissions([])
         return
       }
@@ -66,6 +112,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setPermissions((data as UserPermission[]) || [])
     } catch (err) {
       console.error("Error loading permissions:", err)
+      if (isSessionExpiredError(err)) {
+        throw err
+      }
       setPermissions([])
     }
   }
@@ -75,16 +124,31 @@ export function AuthProvider({ children }: AuthProviderProps) {
    */
   const loadUser = async (userId: string): Promise<void> => {
     try {
-      // Get auth user
-      const { data: authData, error: authError } = await supabase.auth.getUser()
+      // Set a timeout for getting user (3s)
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(
+          () => reject(new Error("User query timeout")),
+          3000
+        )
+      )
+
+      const getUserPromise = supabase.auth.getUser()
+
+      const { data: authData, error: authError } = await Promise.race([
+        getUserPromise,
+        timeoutPromise,
+      ]) as any
 
       if (authError) {
         console.error("Failed to get auth user:", authError)
+        if (isSessionExpiredError(authError)) {
+          throw authError
+        }
         setUser(null)
         return
       }
 
-      if (authData.user) {
+      if (authData?.user) {
         const userData: User = {
           id: authData.user.id,
           email: authData.user.email || "",
@@ -96,6 +160,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
       }
     } catch (err) {
       console.error("Error loading user:", err)
+      if (isSessionExpiredError(err)) {
+        throw err
+      }
       setUser(null)
     }
   }
@@ -106,27 +173,60 @@ export function AuthProvider({ children }: AuthProviderProps) {
   useEffect(() => {
     const initializeAuth = async (): Promise<void> => {
       try {
-        const { data, error } = await supabase.auth.getSession()
+        // Set timeout for session retrieval (10s)
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(
+            () => reject(new Error("Auth initialization timeout")),
+            10000
+          )
+        )
+
+        const sessionPromise = supabase.auth.getSession()
+
+        const { data, error } = await Promise.race([
+          sessionPromise,
+          timeoutPromise,
+        ]) as any
 
         if (error) {
           console.error("Session error:", error)
+          if (isSessionExpiredError(error)) {
+            // Session expired, clear and redirect will happen in router
+            setSession(null)
+            setUser(null)
+            setPermissions([])
+          }
           setLoading(false)
           return
         }
 
-        const currentSession = data.session
+        const currentSession = data?.session
 
         setSession(currentSession)
 
         if (currentSession?.user) {
-          await Promise.all([
-            loadUser(currentSession.user.id),
-            loadPermissions(currentSession.user.id),
-          ])
+          try {
+            await Promise.all([
+              loadUser(currentSession.user.id),
+              loadPermissions(currentSession.user.id),
+            ])
+          } catch (loadErr) {
+            console.error("Error loading user/permissions:", loadErr)
+            if (isSessionExpiredError(loadErr)) {
+              // Session expired during load
+              setSession(null)
+              setUser(null)
+              setPermissions([])
+            }
+          }
         }
       } catch (err) {
         console.error("Auth initialization error:", err)
+        setSession(null)
+        setUser(null)
+        setPermissions([])
       } finally {
+        // CRITICAL: Always set loading to false, even on error
         setLoading(false)
       }
     }
@@ -135,6 +235,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     /**
      * Listen for auth state changes
+     * Handles logout, expiry, and token refresh
      */
     const {
       data: { subscription },
@@ -142,26 +243,42 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setSession(newSession)
 
       if (newSession?.user) {
-        await Promise.all([
-          loadUser(newSession.user.id),
-          loadPermissions(newSession.user.id),
-        ])
+        try {
+          await Promise.all([
+            loadUser(newSession.user.id),
+            loadPermissions(newSession.user.id),
+          ])
+        } catch (err) {
+          console.error("Error on auth state change:", err)
+          if (isSessionExpiredError(err)) {
+            setSession(null)
+            setUser(null)
+            setPermissions([])
+          }
+        }
       } else {
         setUser(null)
         setPermissions([])
       }
     })
 
-    // when the browser (or tab) is closed) attempt to sign out so that any
-    // transient state is cleaned up. This complements using sessionStorage in
-    // the client setup above and also makes the logout explicit instead of
-    // relying solely on storage eviction.
+    /**
+     * Attempt logout when browser closes
+     * Uses timeout to prevent hanging
+     */
     const handleBeforeUnload = async () => {
       try {
-        await supabase.auth.signOut()
+        // Wrap in Promise.race with timeout
+        const timeoutPromise = new Promise((resolve) =>
+          setTimeout(resolve, 2000)
+        )
+
+        const signOutPromise = supabase.auth.signOut()
+
+        await Promise.race([signOutPromise, timeoutPromise])
       } catch (err) {
-        // failure isn't critical; the storage will be cleared by sessionStorage
-        console.warn("Error signing out on unload:", err)
+        // Failure on unload is expected if session expired
+        console.warn("Signout on unload:", err instanceof Error ? err.message : "unknown error")
       }
     }
 

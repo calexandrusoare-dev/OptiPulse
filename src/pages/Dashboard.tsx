@@ -10,14 +10,24 @@ import { getUserModules, getPermissionMatrix } from "../lib/rbac"
 export default function Dashboard() {
   const { user, permissions, refreshPermissions } = useAuth()
   const [refreshing, setRefreshing] = useState(false)
+  const [refreshError, setRefreshError] = useState<string | null>(null)
 
   const userModules = getUserModules(permissions)
   const permissionMatrix = getPermissionMatrix(permissions)
 
   const handleRefreshPermissions = async () => {
+    if (refreshing) return
     setRefreshing(true)
+    setRefreshError(null)
+
     try {
       await refreshPermissions()
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : "Failed to refresh permissions"
+      console.error("Refresh error:", errorMsg)
+      setRefreshError(errorMsg)
+      // Auto-clear error after 3 seconds
+      setTimeout(() => setRefreshError(null), 3000)
     } finally {
       setRefreshing(false)
     }
@@ -64,6 +74,22 @@ export default function Dashboard() {
           {refreshing ? "Refreshing..." : "🔄"}
         </button>
       </div>
+
+      {refreshError && (
+        <div
+          style={{
+            backgroundColor: "#fee2e2",
+            color: "#991b1b",
+            padding: "12px 16px",
+            borderRadius: "4px",
+            marginBottom: "20px",
+            borderLeft: "4px solid #dc2626",
+            fontSize: "14px",
+          }}
+        >
+          ⚠️ {refreshError}
+        </div>
+      )}
 
       <div
         style={{

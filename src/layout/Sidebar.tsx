@@ -3,6 +3,7 @@
  * Main navigation sidebar with RBAC module filtering
  */
 
+import { useState } from "react"
 import { Link, useNavigate, useLocation } from "react-router-dom"
 import { useAuth } from "../auth/AuthProvider"
 import { supabase } from "../api/supabaseClient"
@@ -19,6 +20,7 @@ export default function Sidebar() {
   const { permissions } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
+  const [loggingOut, setLoggingOut] = useState(false)
 
   const userModules = getUserModules(permissions)
 
@@ -79,8 +81,25 @@ export default function Sidebar() {
   ]
 
   const handleLogout = async () => {
-    await supabase.auth.signOut()
-    navigate("/login")
+    if (loggingOut) return
+    setLoggingOut(true)
+
+    try {
+      // Wrap in timeout to prevent hanging
+      const timeoutPromise = new Promise((resolve) =>
+        setTimeout(resolve, 3000)
+      )
+
+      const signOutPromise = supabase.auth.signOut()
+
+      await Promise.race([signOutPromise, timeoutPromise])
+    } catch (err) {
+      console.error("Logout error:", err)
+      // Even if logout fails, force navigation to login
+    } finally {
+      setLoggingOut(false)
+      navigate("/login")
+    }
   }
 
   const isActive = (path: string) => location.pathname === path
@@ -127,8 +146,16 @@ export default function Sidebar() {
       ))}
 
       {/* Logout Button */}
-      <button onClick={handleLogout} className="sidebar-logout">
-        Deconectare
+      <button
+        onClick={handleLogout}
+        disabled={loggingOut}
+        className="sidebar-logout"
+        style={{
+          opacity: loggingOut ? 0.6 : 1,
+          cursor: loggingOut ? "not-allowed" : "pointer",
+        }}
+      >
+        {loggingOut ? "Se deconectează..." : "Deconectare"}
       </button>
     </aside>
   )
