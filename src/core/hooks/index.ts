@@ -37,3 +37,8 @@ export {
   useLogAuditAction,
   useActivityReport,
 } from "./useAudit"
+
+export {
+  useDashboardStats,
+  usePendingTasks,
+} from "./useDashboard"

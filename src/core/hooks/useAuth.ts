@@ -31,7 +31,7 @@ export function useHasPermission(
   const { permissions } = useAuth()
 
   return permissions.some(
-    (p) =>
+    (p: any) =>
       p.module_code.toLowerCase() === moduleCode.toLowerCase() &&
       p.permission_code.toLowerCase() === permissionCode.toLowerCase()
   )

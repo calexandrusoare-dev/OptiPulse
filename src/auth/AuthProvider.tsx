@@ -7,17 +7,7 @@ import {
 } from "react"
 import { supabase } from "../api/supabaseClient"
 import { Session } from "@supabase/supabase-js"
-import { AuthContextType, UserPermission, User } from "../types"
-
-/**
- * AuthContext initialized with default values
- */
-const AuthContext = createContext<AuthContextType>({
-  session: null,
-  user: null,
-  permissions: [],
-  loading: true,
-})
+import { AuthContextType, UserPermission, User } from "@/core/types"
 
 interface AuthProviderProps {
   children: ReactNode
@@ -28,9 +18,23 @@ interface AuthProviderProps {
  * Manages authentication state and user permissions
  * Fetches permissions from core.v_user_permissions view
  */
+export const AuthContext = createContext<AuthContextType>({
+  session: null,
+  user: null,
+  roles: [],
+  permissions: [],
+  loading: true,
+  isAuthenticated: false,
+  refreshPermissions: async () => {},
+  hasRole: () => false,
+  hasPermission: () => false,
+  logout: async () => {},
+})
+
 export function AuthProvider({ children }: AuthProviderProps) {
   const [session, setSession] = useState<Session | null>(null)
   const [user, setUser] = useState<User | null>(null)
+  const [roles, setRoles] = useState<string[]>([])
   const [permissions, setPermissions] = useState<UserPermission[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -58,9 +62,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
       return
     }
     try {
-      await loadPermissions(session.user.id)
+      await Promise.all([
+        loadPermissions(session.user.id),
+        loadRoles(session.user.id),
+      ])
     } catch (err) {
-      console.error("Error refreshing permissions:", err)
+      console.error("Error refreshing permissions/roles:", err)
       if (isSessionExpiredError(err)) {
         // Session expired, force logout
         try {
@@ -71,6 +78,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         setSession(null)
         setUser(null)
         setPermissions([])
+        setRoles([])
       }
     }
   }
@@ -116,6 +124,27 @@ export function AuthProvider({ children }: AuthProviderProps) {
         throw err
       }
       setPermissions([])
+    }
+  }
+
+  const loadRoles = async (userId: string): Promise<void> => {
+    try {
+      const { data, error } = await supabase
+        .from("user_roles")
+        .select("roles(code)")
+        .eq("user_id", userId)
+
+      if (error) {
+        console.error("Failed to load roles:", error)
+        setRoles([])
+        return
+      }
+
+      const roleCodes = (data || []).map((r: any) => r.roles?.code).filter(Boolean)
+      setRoles(roleCodes)
+    } catch (err) {
+      console.error("Error loading roles:", err)
+      setRoles([])
     }
   }
 
@@ -171,6 +200,25 @@ export function AuthProvider({ children }: AuthProviderProps) {
    * Initialize auth state on component mount
    */
   useEffect(() => {
+    // auto-refresh timer to keep session alive
+    let refreshInterval: NodeJS.Timeout | null = null
+    if (session) {
+      // check every minute
+      refreshInterval = setInterval(async () => {
+        try {
+          const { default: AuthService, authService } = await import("@/core/services/AuthService")
+          if (authService.isSessionExpiringsoon(session)) {
+            const refreshed = await authService.refreshSession()
+            if (refreshed?.session) {
+              setSession(refreshed.session)
+            }
+          }
+        } catch (err) {
+          console.warn("Auto-refresh error", err)
+        }
+      }, 60 * 1000)
+    }
+
     const initializeAuth = async (): Promise<void> => {
       try {
         // Set timeout for session retrieval (10s)
@@ -209,14 +257,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
             await Promise.all([
               loadUser(currentSession.user.id),
               loadPermissions(currentSession.user.id),
+              loadRoles(currentSession.user.id),
             ])
           } catch (loadErr) {
-            console.error("Error loading user/permissions:", loadErr)
+            console.error("Error loading user/permissions/roles:", loadErr)
             if (isSessionExpiredError(loadErr)) {
               // Session expired during load
               setSession(null)
               setUser(null)
               setPermissions([])
+              setRoles([])
             }
           }
         }
@@ -247,6 +297,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
           await Promise.all([
             loadUser(newSession.user.id),
             loadPermissions(newSession.user.id),
+            loadRoles(newSession.user.id),
           ])
         } catch (err) {
           console.error("Error on auth state change:", err)
@@ -285,6 +336,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     window.addEventListener("beforeunload", handleBeforeUnload)
 
     return () => {
+      if (refreshInterval) clearInterval(refreshInterval)
       subscription.unsubscribe()
       window.removeEventListener("beforeunload", handleBeforeUnload)
     }
@@ -293,9 +345,30 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const value: AuthContextType = {
     session,
     user,
+    roles,
     permissions,
     loading,
+    isAuthenticated: !!user,
     refreshPermissions,
+    hasPermission: (moduleCode, permissionCode) =>
+      permissions.some(
+        (p) =>
+          p.module_code.toLowerCase() === moduleCode.toLowerCase() &&
+          p.permission_code.toLowerCase() === permissionCode.toLowerCase()
+      ),
+    hasRole: (roleCode: string) =>
+      roles.map((r) => r.toLowerCase()).includes(roleCode.toLowerCase()),
+    logout: async () => {
+      try {
+        await supabase.auth.signOut()
+      } catch (err) {
+        console.error("Logout failed:", err)
+      }
+      setSession(null)
+      setUser(null)
+      setPermissions([])
+      setRoles([])
+    },
   }
 
   return (

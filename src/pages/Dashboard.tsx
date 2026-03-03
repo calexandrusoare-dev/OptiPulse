@@ -5,6 +5,9 @@
 
 import React from 'react';
 import { useTranslation } from 'react-i18next';
+import { useAuth } from '@/auth/AuthProvider';
+import { useDashboardStats, usePendingTasks } from '@/core/hooks';
+import { useRecentActivity } from '@/core/hooks';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
@@ -20,94 +23,44 @@ import {
 } from 'lucide-react';
 
 // NOTE: titles are translation keys, rendered with t()
-const statsCards = [
-  {
-    title: 'vacationDaysRemaining',
-    value: '12',
-    icon: CalendarDays,
-    color: 'bg-rose-100 text-rose-600',
-  },
-  {
-    title: 'weeklyHours',
-    value: '38',
-    icon: Clock,
-    color: 'bg-blue-100 text-blue-600',
-  },
-  {
-    title: 'monthlyBudgetLeft',
-    value: '€4,250',
-    icon: Wallet,
-    color: 'bg-green-100 text-green-600',
-  },
-  {
-    title: 'pendingExpenses',
-    value: '3',
-    icon: Receipt,
-    color: 'bg-orange-100 text-orange-600',
-  },
-];
 
-const recentActivity = [
-  {
-    id: 1,
-    type: 'vacation',
-    titleKey: 'activityVacationApproved',
-    description: 'Concediu de odihnă - 15-19 Aprilie',
-    time: '2 ore în urmă',
-    status: 'aprobat',
-  },
-  {
-    id: 2,
-    type: 'timesheet',
-    titleKey: 'taskVacationApproval',
-    description: '38 ore înregistrate',
-    time: '5 ore în urmă',
-    status: 'trimis',
-  },
-  {
-    id: 3,
-    type: 'expense',
-    titleKey: 'activityExpenseApproved',
-    description: 'Călătorie business - €450',
-    time: '1 zi în urmă',
-    status: 'pending',
-  },
-  {
-    id: 4,
-    type: 'budget',
-    titleKey: 'taskBudgetAlert',
-    description: 'Buget IT: €12,000 / €15,000',
-    time: '2 zile în urmă',
-    status: 'active',
-  },
-];
+// dashboard hooks
 
-const pendingTasks = [
-  {
-    id: 1,
-    titleKey: 'taskVacationApproval',
-    department: 'IT',
-    requester: 'Maria Popescu',
-    days: 5,
-  },
-  {
-    id: 2,
-    titleKey: 'taskExpenseReview',
-    department: 'Marketing',
-    requester: 'Ion Ionescu',
-    status: 'pending',
-  },
-  {
-    id: 3,
-    titleKey: 'taskBudgetAlert',
-    department: 'Sales',
-    requester: 'Ana Georgescu',
-    amount: '€120',
-  },
-];
 
 const Dashboard = () => {
   const { t } = useTranslation()
+  const { user } = useAuth()
+  const stats = useDashboardStats(user?.id)
+  const { logs: activity, loading: activityLoading } = useRecentActivity(10)
+  const { tasks: pendingTasks, loading: tasksLoading } = usePendingTasks(5)
+
+  // build cards array from stats
+  const statsCards = [
+    {
+      title: 'vacationDaysRemaining',
+      value: stats.vacationDaysRemaining,
+      icon: CalendarDays,
+      color: 'bg-rose-100 text-rose-600',
+    },
+    {
+      title: 'weeklyHours',
+      value: stats.weeklyHours,
+      icon: Clock,
+      color: 'bg-blue-100 text-blue-600',
+    },
+    {
+      title: 'monthlyBudgetLeft',
+      value: stats.monthlyBudgetLeft,
+      icon: Wallet,
+      color: 'bg-green-100 text-green-600',
+    },
+    {
+      title: 'pendingExpenses',
+      value: stats.pendingExpenses,
+      icon: Receipt,
+      color: 'bg-orange-100 text-orange-600',
+    },
+  ]
 
   return (
     <div className="space-y-6">
@@ -147,33 +100,29 @@ const Dashboard = () => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {recentActivity.map((activity) => (
-                <div
-                  key={activity.id}
-                  className="flex items-start gap-4 p-4 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors"
-                >
-                  <div className="flex-shrink-0 mt-0.5">
-                    {activity.status === 'aprobat' ? (
+            {activityLoading && <p>Loading...</p>}
+            {!activityLoading && (
+              <div className="space-y-4">
+                {activity.map((act) => (
+                  <div
+                    key={act.id}
+                    className="flex items-start gap-4 p-4 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors"
+                  >
+                    <div className="flex-shrink-0 mt-0.5">
+                      {/* simple icon fallback */}
                       <CheckCircle className="w-5 h-5 text-green-600" />
-                    ) : activity.status === 'trimis' ? (
-                      <Clock className="w-5 h-5 text-blue-600" />
-                    ) : activity.status === 'pending' ? (
-                      <AlertCircle className="w-5 h-5 text-orange-600" />
-                    ) : (
-                      <Wallet className="w-5 h-5 text-rose-600" />
-                    )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-gray-900">{act.action}</p>
+                      <p className="text-sm text-gray-500">{act.details}</p>
+                    </div>
+                    <span className="text-xs text-gray-400 whitespace-nowrap">
+                      {new Date(act.created_at).toLocaleString()}
+                    </span>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-gray-900">{t(activity.titleKey)}</p>
-                    <p className="text-sm text-gray-500">{activity.description}</p>
-                  </div>
-                  <span className="text-xs text-gray-400 whitespace-nowrap">
-                    {activity.time}
-                  </span>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -186,18 +135,24 @@ const Dashboard = () => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {pendingTasks.map((task) => (
-                <div
-                  key={task.id}
-                  className="p-4 rounded-lg border border-gray-100 hover:border-primary/20 hover:bg-primary/5 transition-colors cursor-pointer"
-                >
-                  <div className="flex items-start justify-between mb-2">
-                    <p className="font-medium text-gray-900 text-sm">{t(task.titleKey)}</p>
-                    <Badge variant="warning">Nou</Badge>
-                  </div>
-                  <div className="flex items-center gap-2 text-xs text-gray-500">
-                    <span>{task.department}</span>
+            {tasksLoading && <p>Loading...</p>}
+            {!tasksLoading && (
+              <div className="space-y-4">
+                {pendingTasks.map((task) => (
+                  <div
+                    key={task.id}
+                    className="p-4 rounded-lg border border-gray-100 hover:border-primary/20 hover:bg-primary/5 transition-colors cursor-pointer"
+                  >
+                    <div className="flex items-start justify-between mb-2">
+                      <p className="font-medium text-gray-900 text-sm">{t(task.titleKey)}</p>
+                      <Badge variant="warning">Nou</Badge>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-gray-500">
+                      <span>{task.department}</span>
+                      {task.requester && <span>· {task.requester}</span>}
+                      {task.days && <span>· {task.days} zile</span>}
+                      {task.amount && <span>· {task.amount}</span>}
+                    </div>
                     <span>•</span>
                     <span>{task.requester}</span>
                   </div>

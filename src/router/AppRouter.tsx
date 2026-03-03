@@ -26,6 +26,9 @@ import KPI from "../modules/finance/KPI"
 
 // Admin Module
 import Users from "../modules/admin/Users"
+import AuditLogs from "../pages/AuditLogs"
+import Roles from "../modules/admin/Roles"
+import Permissions from "../modules/admin/Permissions"
 
 export default function AppRouter() {
   const { session, loading } = useAuth()
@@ -75,6 +78,9 @@ export default function AppRouter() {
 
           {/* Admin Module Routes */}
           <Route path="admin/users" element={<ProtectedRoute moduleCode="admin"><Users /></ProtectedRoute>} />
+          <Route path="admin/roles" element={<ProtectedRoute moduleCode="admin"><Roles /></ProtectedRoute>} />
+          <Route path="admin/permissions" element={<ProtectedRoute moduleCode="admin"><Permissions /></ProtectedRoute>} />
+          <Route path="admin/audit" element={<ProtectedRoute moduleCode="admin"><AuditLogs /></ProtectedRoute>} />
         </Route>
 
         {/* Catch-all - redirect to home or login */}

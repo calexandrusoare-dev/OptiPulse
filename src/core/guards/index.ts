@@ -17,7 +17,7 @@ export function guardHasPermission(
   const pcode = permissionCode.toLowerCase()
 
   return permissions.some(
-    (p) =>
+    (p: UserPermission) =>
       p.module_code.toLowerCase() === m &&
       p.permission_code.toLowerCase() === pcode
   )
@@ -84,7 +84,7 @@ export function guardCanViewModule(
   moduleCode: string
 ): boolean {
   const m = moduleCode.toLowerCase()
-  return permissions.some((p) => p.module_code.toLowerCase() === m)
+  return permissions.some((p: UserPermission) => p.module_code.toLowerCase() === m)
 }
 
 /**

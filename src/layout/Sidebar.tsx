@@ -19,12 +19,16 @@ interface NavItem {
 
 export default function Sidebar() {
   const { t } = useTranslation()
-  const { permissions } = useAuth()
+  const { permissions, hasRole } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const [loggingOut, setLoggingOut] = useState(false)
 
-  const userModules = getUserModules(permissions)
+  // super admins and admins see every module
+  const userModules =
+    hasRole("super_admin") || hasRole("admin")
+      ? [] // empty list will be treated as 'show all' below
+      : getUserModules(permissions)
 
   const navItems: NavItem[] = [
     // HR Module
@@ -79,6 +83,24 @@ export default function Sidebar() {
       to: "/admin/users",
       module: "admin",
       icon: "👥",
+    },
+    {
+      labelKey: "navRoles",
+      to: "/admin/roles",
+      module: "admin",
+      icon: "🛡️",
+    },
+    {
+      labelKey: "navPermissions",
+      to: "/admin/permissions",
+      module: "admin",
+      icon: "🔑",
+    },
+    {
+      labelKey: "navAuditLogs",
+      to: "/admin/audit",
+      module: "admin",
+      icon: "📜",
     },
   ]
 

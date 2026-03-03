@@ -19,7 +19,7 @@ export default function ProtectedRoute({
   children,
   moduleCode,
 }: ProtectedRouteProps) {
-  const { session, permissions, loading } = useAuth();
+  const { session, permissions, loading, hasRole } = useAuth();
   const location = useLocation();
 
   // Așteaptă să se termine loading-ul auth
@@ -36,8 +36,7 @@ export default function ProtectedRoute({
   if (moduleCode) {
     // require any permission in the module (view/edit/create/…)
     const hasAccess = hasModuleAccess(permissions, moduleCode);
-
-    if (!hasAccess) {
+    // admins/super admins bypass all checks    if (!hasAccess && !hasRole('super_admin') && !hasRole('admin')) {
       // îl trimitem către o pagină de acces refuzat
       return <Navigate to="/access-denied" replace />;
     }

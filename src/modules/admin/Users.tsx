@@ -30,74 +30,17 @@ import {
 } from '@/components/ui/table';
 import { Plus, User, Mail, Phone, Edit, Trash2, MoreVertical } from 'lucide-react';
 import { getStatusColor, departments, userRoles } from '@/lib/utils';
+import { useLogAuditAction, useNotification } from '@/core/hooks';
 
-const mockUsers = [
-  {
-    id: 1,
-    name: 'John Doe',
-    email: 'john.doe@rocket.ro',
-    phone: '+40 721 234 567',
-    role: 'admin',
-    department: 'IT',
-    status: 'activ',
-    avatar: 'JD',
-  },
-  {
-    id: 2,
-    name: 'Maria Popescu',
-    email: 'maria.popescu@rocket.ro',
-    phone: '+40 721 234 568',
-    role: 'manager',
-    department: 'IT',
-    status: 'activ',
-    avatar: 'MP',
-  },
-  {
-    id: 3,
-    name: 'Ion Ionescu',
-    email: 'ion.ionescu@rocket.ro',
-    phone: '+40 721 234 569',
-    role: 'user',
-    department: 'Marketing',
-    status: 'activ',
-    avatar: 'II',
-  },
-  {
-    id: 4,
-    name: 'Ana Georgescu',
-    email: 'ana.georgescu@rocket.ro',
-    phone: '+40 721 234 570',
-    role: 'user',
-    department: 'Sales',
-    status: 'activ',
-    avatar: 'AG',
-  },
-  {
-    id: 5,
-    name: 'Elena Dumitrescu',
-    email: 'elena.dumitrescu@rocket.ro',
-    phone: '+40 721 234 571',
-    role: 'user',
-    department: 'HR',
-    status: 'inactiv',
-    avatar: 'ED',
-  },
-  {
-    id: 6,
-    name: 'George Popa',
-    email: 'george.popa@rocket.ro',
-    phone: '+40 721 234 572',
-    role: 'user',
-    department: 'Finance',
-    status: 'activ',
-    avatar: 'GP',
-  },
-];
+// temporary structure matching service output
+// will be populated from backend via userService
+
 
 const Users = () => {
-  const [users, setUsers] = useState(mockUsers);
+  const [users, setUsers] = useState<any[]>([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingUser, setEditingUser] = useState(null);
+  const [editingUser, setEditingUser] = useState<any>(null);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -106,37 +49,71 @@ const Users = () => {
     department: '',
     status: 'activ',
   });
+  const [allRoles, setAllRoles] = useState<any[]>([]);
 
-  const handleSubmit = (e) => {
+  const { user } = useAuth();
+  const refreshPermissions = useRefreshPermissions();
+  const { logAction } = useLogAuditAction();
+  const { addNotification } = useNotification();
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (editingUser) {
-      setUsers(
-        users.map((u) =>
-          u.id === editingUser.id
-            ? { ...u, ...formData, avatar: formData.name.split(' ').map(n => n[0]).join('').toUpperCase() }
-            : u
-        )
-      );
-    } else {
-      setUsers([
-        ...users,
-        {
-          ...formData,
-          id: users.length + 1,
-          avatar: formData.name.split(' ').map(n => n[0]).join('').toUpperCase(),
-        },
-      ]);
+    try {
+      const { userService, roleService } = await import('@/core/services');
+
+      if (editingUser) {
+        // update user
+        const updated = await userService.updateUser(editingUser.id, {
+          email: formData.email,
+          full_name: formData.name,
+          phone: formData.phone,
+          is_active: formData.status === 'activ',
+        }, user?.id)
+        if (updated) {
+          // update role if changed
+          if (formData.role && !editingUser.roles?.includes(formData.role)) {
+            const roleObj = allRoles.find((r) => r.code === formData.role)
+            if (roleObj) {
+              await roleService.assignRoleToUser(
+                editingUser.id,
+                roleObj.id,
+                user?.id
+              )
+            }
+          }
+          setUsers(
+            users.map((u) =>
+              u.id === editingUser.id ? { ...u, ...updated, roles: [formData.role] } : u
+            )
+          )
+          await logAction(
+            user?.id || '',
+            'UPDATE',
+            'users',
+            editingUser.id,
+            { newValue: updated }
+          )
+          addNotification('User updated successfully', 'success')
+        }
+      } else {
+        // creating a user is beyond scope - just log and close
+        // could call userService.createUser
+        console.warn('Create user not implemented yet')
+      }
+    } catch (err) {
+      console.error('Error saving user', err)
+    } finally {
+      setIsDialogOpen(false);
+      setEditingUser(null);
+      setFormData({
+        name: '',
+        email: '',
+        phone: '',
+        role: '',
+        department: '',
+        status: 'activ',
+      });
     }
-    setIsDialogOpen(false);
-    setEditingUser(null);
-    setFormData({
-      name: '',
-      email: '',
-      phone: '',
-      role: '',
-      department: '',
-      status: 'activ',
-    });
   };
 
   const handleEdit = (user) => {
@@ -152,23 +129,92 @@ const Users = () => {
     setIsDialogOpen(true);
   };
 
-  const handleDelete = (id) => {
+  const handleDelete = async (id) => {
     if (confirm('Ești sigur că vrei să ștergi acest angajat?')) {
-      setUsers(users.filter((u) => u.id !== id));
+      try {
+        const { userService } = await import('@/core/services');
+        const success = await userService.deactivateUser(id, user?.id)
+        if (success) {
+          setUsers(users.filter((u) => u.id !== id));
+          await logAction(user?.id || '', 'DELETE', 'users', id)
+          if (id === user?.id) {
+            refreshPermissions()
+          }
+          addNotification('User deactivated', 'info')
+        }
+      } catch (err) {
+        console.error('Error deactivating user', err);
+      }
     }
   };
 
-  const toggleStatus = (id) => {
-    setUsers(
-      users.map((u) =>
-        u.id === id ? { ...u, status: u.status === 'activ' ? 'inactiv' : 'activ' } : u
-      )
-    );
+  const toggleStatus = async (id) => {
+    try {
+      const { userService } = await import('@/core/services');
+      const userObj = users.find((u) => u.id === id)
+      if (!userObj) return
+      const active = userObj.status === 'activ'
+      const success = active
+        ? await userService.deactivateUser(id, user?.id)
+        : await userService.activateUser(id, user?.id)
+      if (success) {
+        setUsers(
+          users.map((u) =>
+            u.id === id
+              ? { ...u, status: active ? 'inactiv' : 'activ' }
+              : u
+          )
+        )
+        await logAction(
+          user?.id || '',
+          'UPDATE',
+          'users',
+          id,
+          { description: active ? 'deactivated' : 'reactivated' }
+        )
+        if (id === user?.id) {
+          refreshPermissions()
+        }
+      }
+    } catch (err) {
+      console.error('Error toggling status', err)
+    }
   };
 
   const activeUsers = users.filter((u) => u.status === 'activ').length;
   const adminUsers = users.filter((u) => u.role === 'admin').length;
   const managerUsers = users.filter((u) => u.role === 'manager').length;
+
+  // load users on mount
+  React.useEffect(() => {
+    const load = async () => {
+      setLoadingUsers(true);
+      try {
+        const { userService } = await import('@/core/services/UserService');
+        const { roleService } = await import('@/core/services/RoleService');
+
+        // fetch all roles for select dropdown
+        const roles = await roleService.getAllRoles();
+        setAllRoles(roles);
+
+        const res = await userService.getUsers();
+        const fetched = res.data || [];
+        // for each user fetch roles
+        const withRoles = await Promise.all(
+          fetched.map(async (u) => {
+            const roles = await roleService.getUserRoles(u.id);
+            return { ...u, roles: roles.map((r) => r.code) };
+          })
+        );
+        setUsers(withRoles);
+      } catch (err) {
+        console.error('Error loading users', err);
+      } finally {
+        setLoadingUsers(false);
+      }
+    };
+    load();
+  }, []);
 
   return (
     <div className="space-y-6">
@@ -415,17 +461,29 @@ const Users = () => {
                     </div>
                   </TableCell>
                   <TableCell>
-                    <Badge
-                      variant={
-                        user.role === 'admin'
-                          ? 'destructive'
-                          : user.role === 'manager'
-                          ? 'default'
-                          : 'secondary'
-                      }
-                    >
-                      {userRoles.find((r) => r.value === user.role)?.label}
-                    </Badge>
+                    <div className="flex flex-wrap gap-1">
+                      {user.roles && user.roles.length > 0 ? (
+                        user.roles.map((roleCode) => {
+                          const r = userRoles.find((r) => r.value === roleCode)
+                          return (
+                            <Badge
+                              key={roleCode}
+                              variant={
+                                roleCode === 'admin'
+                                  ? 'destructive'
+                                  : roleCode === 'super_admin'
+                                  ? 'destructive'
+                                  : 'secondary'
+                              }
+                            >
+                              {r ? r.label : roleCode}
+                            </Badge>
+                          )
+                        })
+                      ) : (
+                        <span className="text-sm text-gray-500">-</span>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell>
                     {departments.find((d) => d.value === user.department)?.label ||

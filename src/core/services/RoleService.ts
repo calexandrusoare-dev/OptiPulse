@@ -80,7 +80,10 @@ class RoleService {
   /**
    * Create new role
    */
-  async createRole(role: Omit<Role, "id" | "created_at" | "updated_at">): Promise<Role | null> {
+  async createRole(
+    role: Omit<Role, "id" | "created_at" | "updated_at">,
+    actorId?: string
+  ): Promise<Role | null> {
     try {
       const { data, error } = await supabase
         .from("roles")
@@ -93,7 +96,21 @@ class RoleService {
         return null
       }
 
-      return data as Role
+      const created = data as Role
+      if (actorId) {
+        import("@/core/services")
+          .then(({ auditService }) => {
+            auditService.logAction(
+              actorId,
+              "CREATE",
+              "roles",
+              created.id,
+              { newValue: created }
+            )
+          })
+          .catch((e) => console.error("Audit log error:", e))
+      }
+      return created
     } catch (error) {
       console.error("Create role error:", error)
       return null
@@ -103,8 +120,22 @@ class RoleService {
   /**
    * Update role
    */
-  async updateRole(roleId: string, updates: Partial<Role>): Promise<Role | null> {
+  async updateRole(
+    roleId: string,
+    updates: Partial<Role>,
+    actorId?: string
+  ): Promise<Role | null> {
     try {
+      let oldRecord: Role | null = null
+      if (actorId) {
+        const { data: existing } = await supabase
+          .from("roles")
+          .select("*")
+          .eq("id", roleId)
+          .single()
+        oldRecord = (existing as Role) || null
+      }
+
       const { data, error } = await supabase
         .from("roles")
         .update(updates)
@@ -117,7 +148,22 @@ class RoleService {
         return null
       }
 
-      return data as Role
+      const updated = data as Role
+      if (actorId) {
+        import("@/core/services")
+          .then(({ auditService }) => {
+            auditService.logAction(
+              actorId,
+              "UPDATE",
+              "roles",
+              roleId,
+              { oldValue: oldRecord || undefined, newValue: updated }
+            )
+          })
+          .catch((e) => console.error("Audit log error:", e))
+      }
+
+      return updated
     } catch (error) {
       console.error("Update role error:", error)
       return null
@@ -127,8 +173,14 @@ class RoleService {
   /**
    * Delete role (soft delete via is_active)
    */
-  async deleteRole(roleId: string): Promise<boolean> {
+  async deleteRole(roleId: string, actorId?: string): Promise<boolean> {
     try {
+      const { data: oldData } = await supabase
+        .from("roles")
+        .select("*")
+        .eq("id", roleId)
+        .single()
+
       const { error } = await supabase
         .from("roles")
         .update({ is_active: false })
@@ -137,6 +189,20 @@ class RoleService {
       if (error) {
         console.error("Error deleting role:", error)
         return false
+      }
+
+      if (actorId) {
+        import("@/core/services")
+          .then(({ auditService }) => {
+            auditService.logAction(
+              actorId,
+              "DELETE",
+              "roles",
+              roleId,
+              { oldValue: oldData || undefined }
+            )
+          })
+          .catch((e) => console.error("Audit log error:", e))
       }
 
       return true
@@ -149,7 +215,11 @@ class RoleService {
   /**
    * Assign role to user
    */
-  async assignRoleToUser(userId: string, roleId: string): Promise<UserRole | null> {
+  async assignRoleToUser(
+    userId: string,
+    roleId: string,
+    actorId?: string
+  ): Promise<UserRole | null> {
     try {
       // Check if assignment already exists
       const { data: existing } = await supabase
@@ -178,6 +248,19 @@ class RoleService {
         return null
       }
 
+      if (actorId) {
+        import("@/core/services")
+          .then(({ auditService }) => {
+            auditService.logAction(
+              actorId,
+              "CREATE",
+              "user_roles",
+              `${userId}:${roleId}`
+            )
+          })
+          .catch((e) => console.error("Audit log error:", e))
+      }
+
       return data as UserRole
     } catch (error) {
       console.error("Assign role to user error:", error)
@@ -188,7 +271,11 @@ class RoleService {
   /**
    * Remove role from user
    */
-  async removeRoleFromUser(userId: string, roleId: string): Promise<boolean> {
+  async removeRoleFromUser(
+    userId: string,
+    roleId: string,
+    actorId?: string
+  ): Promise<boolean> {
     try {
       const { error } = await supabase
         .from("user_roles")
@@ -199,6 +286,19 @@ class RoleService {
       if (error) {
         console.error("Error removing role from user:", error)
         return false
+      }
+
+      if (actorId) {
+        import("@/core/services")
+          .then(({ auditService }) => {
+            auditService.logAction(
+              actorId,
+              "DELETE",
+              "user_roles",
+              `${userId}:${roleId}`
+            )
+          })
+          .catch((e) => console.error("Audit log error:", e))
       }
 
       return true
@@ -276,9 +376,31 @@ class RoleService {
         return []
       }
 
-      return (data?.map((ur) => ur.user_id) || []) as string[]
+      return (data?.map((ur: any) => ur.user_id) || []) as string[]
     } catch (error) {
       console.error("Get users by role error:", error)
+      return []
+    }
+  }
+
+  /**
+   * Get all roles assigned to a user
+   */
+  async getUserRoles(userId: string): Promise<Role[]> {
+    try {
+      const { data, error } = await supabase
+        .from("user_roles")
+        .select("roles(*)")
+        .eq("user_id", userId)
+
+      if (error) {
+        console.error("Error fetching roles for user:", error)
+        return []
+      }
+
+      return (data?.map((ur: any) => ur.roles) || []) as Role[]
+    } catch (error) {
+      console.error("Get user roles error:", error)
       return []
     }
   }
@@ -295,14 +417,15 @@ class RoleService {
 
       const { data, error } = await supabase
         .from("user_roles")
-        .insert(assignments, { ignoreDuplicates: true })
+        .insert(assignments) // supabase-js typings don't support ignoreDuplicates option
 
       if (error) {
         console.error("Error bulk assigning role:", error)
         return 0
       }
 
-      return data?.length || 0
+      const arr = data as any[] | null
+      return Array.isArray(arr) ? arr.length : 0
     } catch (error) {
       console.error("Bulk assign role error:", error)
       return 0

@@ -3,7 +3,21 @@
  * Permission checking and access control helpers
  */
 
-import { UserPermission, PermissionCheckParams } from "../types"
+import { UserPermission, PermissionCheckParams } from "@/core/types"
+import {
+  guardHasPermission,
+  guardCanViewModule,
+  guardCanCreate,
+  guardCanEdit,
+  guardCanDelete,
+  guardCanApprove,
+  guardHasAnyPermission,
+  guardHasAllPermissions,
+  guardEnforceAccess,
+  guardHasRole,
+  guardIsAdmin,
+  guardIsSuperAdmin,
+} from "@/core/guards"
 
 /**
  * Check if user has specific permission
@@ -12,24 +26,7 @@ import { UserPermission, PermissionCheckParams } from "../types"
  * @param permissionCode Permission code to check
  * @returns true if user has permission
  */
-export function hasPermission(
-  permissions: UserPermission[],
-  moduleCode: string,
-  permissionCode: string
-): boolean {
-  if (!Array.isArray(permissions)) {
-    return false
-  }
-
-  const m = moduleCode.toLowerCase()
-  const pcode = permissionCode.toLowerCase()
-
-  return permissions.some(
-    (p) =>
-      p.module_code.toLowerCase() === m &&
-      p.permission_code.toLowerCase() === pcode
-  )
-}
+export const hasPermission = guardHasPermission
 
 /**
  * Check if user has view permission for module
@@ -37,17 +34,7 @@ export function hasPermission(
  * @param moduleCode Module code to check
  * @returns true if user can view module
  */
-export function canView(
-  permissions: UserPermission[],
-  moduleCode: string
-): boolean {
-  if (!Array.isArray(permissions)) {
-    return false
-  }
-
-  const m = moduleCode.toLowerCase()
-  return permissions.some((p) => p.module_code.toLowerCase() === m)
-}
+export const canView = guardCanViewModule
 
 /**
  * Check if user can create in a module
@@ -55,12 +42,7 @@ export function canView(
  * @param moduleCode Module code to check
  * @returns true if user has create permission
  */
-export function canCreate(
-  permissions: UserPermission[],
-  moduleCode: string
-): boolean {
-  return hasPermission(permissions, moduleCode, "create")
-}
+export const canCreate = guardCanCreate
 
 /**
  * Check if user can edit in a module
@@ -68,12 +50,7 @@ export function canCreate(
  * @param moduleCode Module code to check
  * @returns true if user has edit permission
  */
-export function canEdit(
-  permissions: UserPermission[],
-  moduleCode: string
-): boolean {
-  return hasPermission(permissions, moduleCode, "edit")
-}
+export const canEdit = guardCanEdit
 
 /**
  * Check if user can delete in a module
@@ -81,12 +58,7 @@ export function canEdit(
  * @param moduleCode Module code to check
  * @returns true if user has delete permission
  */
-export function canDelete(
-  permissions: UserPermission[],
-  moduleCode: string
-): boolean {
-  return hasPermission(permissions, moduleCode, "delete")
-}
+export const canDelete = guardCanDelete
 
 /**
  * Check if user can approve in a module
@@ -94,12 +66,7 @@ export function canDelete(
  * @param moduleCode Module code to check
  * @returns true if user has approve permission
  */
-export function canApprove(
-  permissions: UserPermission[],
-  moduleCode: string
-): boolean {
-  return hasPermission(permissions, moduleCode, "approve")
-}
+export const canApprove = guardCanApprove
 
 /**
  * Get all modules user has access to
@@ -107,13 +74,10 @@ export function canApprove(
  * @returns Array of unique module codes
  */
 export function getUserModules(permissions: UserPermission[]): string[] {
-  if (!Array.isArray(permissions)) {
-    return []
-  }
-
-  // normalize codes so UI filtering is case-insensitive
-  const modules = new Set(permissions.map((p) => p.module_code.toLowerCase()))
-  return Array.from(modules)
+  if (!Array.isArray(permissions)) return []
+  return Array.from(
+    new Set(permissions.map((p) => p.module_code.toLowerCase()))
+  )
 }
 
 /**
@@ -126,10 +90,7 @@ export function getModulePermissions(
   permissions: UserPermission[],
   moduleCode: string
 ): string[] {
-  if (!Array.isArray(permissions)) {
-    return []
-  }
-
+  if (!Array.isArray(permissions)) return []
   const m = moduleCode.toLowerCase()
   return permissions
     .filter((p) => p.module_code.toLowerCase() === m)
@@ -142,14 +103,7 @@ export function getModulePermissions(
  * @param conditions Array of module-permission pairs
  * @returns true if user has ANY of the permissions
  */
-export function hasAnyPermission(
-  permissions: UserPermission[],
-  conditions: PermissionCheckParams[]
-): boolean {
-  return conditions.some((condition) =>
-    hasPermission(permissions, condition.moduleCode, condition.permissionCode)
-  )
-}
+export const hasAnyPermission = guardHasAnyPermission
 
 /**
  * Check multiple permission conditions (AND logic)
@@ -157,14 +111,7 @@ export function hasAnyPermission(
  * @param conditions Array of module-permission pairs
  * @returns true if user has ALL of the permissions
  */
-export function hasAllPermissions(
-  permissions: UserPermission[],
-  conditions: PermissionCheckParams[]
-): boolean {
-  return conditions.every((condition) =>
-    hasPermission(permissions, condition.moduleCode, condition.permissionCode)
-  )
-}
+export const hasAllPermissions = guardHasAllPermissions
 
 /**
  * Module access check

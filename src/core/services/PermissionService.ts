@@ -83,7 +83,7 @@ class PermissionService {
     }
 
     const m = moduleCode.toLowerCase()
-    return permissions.some((p) => p.module_code.toLowerCase() === m)
+    return permissions.some((p: UserPermission) => p.module_code.toLowerCase() === m)
   }
 
   /**
